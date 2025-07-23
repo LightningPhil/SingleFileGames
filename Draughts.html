@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classic Draughts - Accurate Wins</title>
+    <style>
+        :root {
+            /* Board Colors */
+            --light-square-bg: #E0C4A0; 
+            --dark-square-bg: #6A4F3B;  
+            --board-border-color: #4A3B31;
+
+            /* Piece Colors */
+            --white-piece-bg: #F0E6D6; 
+            --white-piece-border: #D0C6B6;
+            --black-piece-bg: #5C3D2E; 
+            --black-piece-border: #3C2D1E;
+            --king-crown-color: #FFD700; 
+
+            /* UI Colors */
+            --info-panel-bg: rgba(0,0,0,0.02);
+            --game-container-bg: rgba(255, 255, 255, 0.95);
+            --button-bg: #0077cc;
+            --button-hover-bg: #005fa3;
+            --text-color: #333;
+            --header-color: var(--dark-square-bg);
+            --valid-move-highlight-bg: rgba(76, 175, 80, 0.5);
+            --button-danger-bg: #d9534f;
+            --button-danger-hover-bg: #c9302c;
+            --button-secondary-bg: #6c757d;
+            --button-secondary-hover-bg: #5a6268;
+            --button-info-bg: #5a9;
+            --button-info-hover-bg: #498;
+
+            /* Slider Colors */
+            --slider-fast-color: #d9534f; 
+            --slider-slow-color: #5cb85c; 
+        }
+
+        body {
+            font-family: 'Arial Rounded MT Bold', 'Helvetica Rounded', Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #c2b280 0%, #8c7853 100%);
+            color: var(--text-color);
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .game-container {
+            display: flex;
+            width: 95vw;
+            height: 95vh;
+            background-color: var(--game-container-bg);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+        }
+
+        .info-panel {
+            flex-basis: 35%;
+            max-width: 400px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background-color: var(--info-panel-bg);
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+        }
+
+        .info-panel-top-content {
+            display: flex;
+            flex-direction: column;
+            gap: 10px; 
+        }
+
+        .board-panel {
+            flex-basis: 65%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background-color: #e8e8e8;
+            overflow: hidden;
+        }
+
+        h1 {
+            color: var(--header-color);
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-align: center;
+        }
+
+        .player-setup {
+            display: flex;
+            justify-content: space-around;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        .player-setup div { display: flex; flex-direction: column; align-items: center; }
+        .player-setup label { margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+        .player-setup input[type="text"] {
+            padding: 8px; border: 2px solid var(--header-color); border-radius: 5px;
+            text-align: center; font-size: 0.9em; width: 120px;
+        }
+
+        #gameInfo {
+            text-align: center;
+            min-height: 2.5em;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+        #turnInfo { font-weight: bold; display: block; font-size: 1.1em; }
+        #playerRoleInfo { font-size: 0.9em; color: #555; display: block; margin-top: 3px;}
+
+        .message-area {
+            font-size: 1.1em; font-weight: bold;
+            min-height: 35px;
+            text-align: center;
+            border: 1px dashed #ccc;
+            padding: 8px 5px;
+            border-radius: 5px;
+            background-color: #fff;
+            line-height: 1.3;
+        }
+
+        .buttons-container, .concede-buttons-container {
+            display: flex;
+            flex-wrap: wrap; 
+            gap: 8px; 
+            justify-content: center;
+            margin-top: 10px;
+        }
+        button {
+            color: white; border: none;
+            padding: 10px 12px; 
+            font-size: 0.9em; 
+            font-weight: bold;
+            border-radius: 6px; 
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15); 
+            flex-grow: 1;
+            min-width: 120px; 
+            max-width: 180px;
+        }
+        button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        button:active:not(:disabled) { transform: translateY(0px); box-shadow: 0 2px 4px rgba(0,0,0,0.15); }
+        button:disabled { background-color: #ccc; cursor: not-allowed; transform: translateY(0px); opacity: 0.7; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
+
+        #startGameButton { background-color: var(--button-bg); }
+        #startGameButton:hover:not(:disabled) { background-color: var(--button-hover-bg); }
+
+        #resetScoresButton { background-color: var(--button-secondary-bg); }
+        #resetScoresButton:hover:not(:disabled) { background-color: var(--button-secondary-hover-bg); }
+
+        #toggleHighlightsButton { background-color: var(--button-info-bg); }
+        #toggleHighlightsButton:hover:not(:disabled) { background-color: var(--button-info-hover-bg); }
+        
+        #toggleAutoJumpButton { background-color: var(--button-info-bg); } 
+        #toggleAutoJumpButton:hover:not(:disabled) { background-color: var(--button-info-hover-bg); }
+
+
+        .concede-buttons-container button { background-color: var(--button-danger-bg); }
+        .concede-buttons-container button:hover:not(:disabled) { background-color: var(--button-danger-hover-bg); }
+
+        .speed-slider-container {
+            margin-top: 15px;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background-color: rgba(0,0,0,0.02);
+            text-align: center;
+        }
+        .speed-slider-container label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+            font-weight: bold;
+            color: var(--header-color);
+        }
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+            padding: 0 5px; 
+        }
+        .slider-labels .fast-label { color: var(--slider-fast-color); font-weight: bold; }
+        .slider-labels .slow-label { color: var(--slider-slow-color); font-weight: bold; }
+
+        #autoMoveSpeedSlider {
+            width: calc(100% - 20px); 
+            margin: 0 auto;
+            cursor: pointer;
+        }
+        #autoMoveSpeedSlider::-webkit-slider-runnable-track {
+            height: 8px;
+            background: linear-gradient(to right, var(--slider-fast-color), var(--slider-slow-color));
+            border-radius: 4px;
+        }
+        #autoMoveSpeedSlider::-moz-range-track {
+            height: 8px;
+            background: linear-gradient(to right, var(--slider-fast-color), var(--slider-slow-color));
+            border-radius: 4px;
+        }
+        #autoMoveSpeedSlider::-ms-track { 
+            height: 8px;
+            background: transparent; 
+            border-color: transparent;
+            color: transparent;
+        }
+        #autoMoveSpeedSlider::-ms-fill-lower {
+            background: var(--slider-fast-color);
+            border-radius: 4px;
+        }
+        #autoMoveSpeedSlider::-ms-fill-upper {
+            background: var(--slider-slow-color);
+            border-radius: 4px;
+        }
+        #autoMoveSpeedSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border: 2px solid var(--button-secondary-bg);
+            border-radius: 50%;
+            margin-top: -5px; 
+        }
+        #autoMoveSpeedSlider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border: 2px solid var(--button-secondary-bg);
+            border-radius: 50%;
+        }
+         #autoMoveSpeedSlider:disabled::-webkit-slider-thumb { background: #ccc; border-color: #bbb; }
+         #autoMoveSpeedSlider:disabled::-moz-range-thumb { background: #ccc; border-color: #bbb; }
+         #autoMoveSpeedSlider:disabled::-webkit-slider-runnable-track { background: #ddd; }
+         #autoMoveSpeedSlider:disabled::-moz-range-track { background: #ddd; }
+
+
+        #coinFlipDisplay {
+            visibility: hidden;
+            min-height: 110px;
+            text-align: center;
+            margin-top: 10px;
+            perspective: 1000px;
+        }
+        #coinElement {
+            width:60px; height:60px; position:relative;
+            margin:0 auto 10px auto; transform-style:preserve-3d;
+        }
+        .coin-face {
+            position:absolute; width:100%; height:100%;
+            border-radius:50%; backface-visibility:hidden;
+            display:flex; align-items:center; justify-content:center;
+            font-weight:bold; font-size: 0.8em;
+            box-sizing: border-box;
+        }
+        .coin-face.white-side {
+             background-color: var(--white-piece-bg); color: var(--black-piece-bg); border: 2px solid var(--black-piece-bg);
+        }
+        .coin-face.black-side {
+            background-color: var(--black-piece-bg); color: var(--white-piece-bg); border: 2px solid var(--white-piece-bg);
+            transform:rotateY(180deg);
+        }
+        #coinFlipResultText { font-weight: bold; font-size: 1.1em; min-height: 1.3em; }
+
+        #scoreBoard {
+            margin-top: auto; padding-top: 15px; border-top: 1px solid #eee;
+            text-align: center;
+            font-size: 1.5em;
+        }
+        #scoreBoard h3 { margin-top: 0; margin-bottom: 10px; color: var(--header-color); font-size: 0.8em; }
+        #scoreBoard p { margin: 5px 0; font-size: 0.7em; }
+        #scoreBoard span { font-weight: bold; }
+
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            width: auto;
+            height: 95%;
+            max-height: 95vh;
+            max-width: 95%;
+            aspect-ratio: 1/1;
+            margin: auto;
+            border: 5px solid var(--board-border-color);
+            box-shadow: 0 0 15px rgba(0,0,0,0.3);
+        }
+        .square {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .light-square { background-color: var(--light-square-bg); }
+        .dark-square { background-color: var(--dark-square-bg); }
+
+        .piece {
+            width: 75%;
+            height: 75%;
+            border-radius: 50%;
+            box-sizing: border-box;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+            font-size: calc(var(--board-cell-size, 50px) * 0.3);
+            position: relative;
+            z-index: 2;
+        }
+        .white-piece {
+            background-color: var(--white-piece-bg);
+            border: 3px solid var(--white-piece-border);
+            box-shadow: inset 0 -3px 4px rgba(0,0,0,0.15), 0 2px 3px rgba(0,0,0,0.2);
+        }
+        .black-piece {
+            background-color: var(--black-piece-bg);
+            border: 3px solid var(--black-piece-border);
+            box-shadow: inset 0 -3px 4px rgba(0,0,0,0.2), 0 2px 3px rgba(0,0,0,0.3);
+        }
+        .king::after {
+            content: 'K';
+            font-weight: bold;
+            font-size: 1.5em;
+            color: var(--king-crown-color);
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.7);
+            position: absolute;
+        }
+        .white-piece.king::after { color: var(--black-piece-bg); text-shadow: 1px 1px 1px rgba(255,255,255,0.5); }
+
+        .selected-piece-style {
+            transform: scale(1.15);
+            box-shadow: 0 0 12px 4px var(--king-crown-color) !important; 
+            animation: none !important; 
+        }
+        .dark-square.valid-move-highlight {
+            cursor: pointer;
+        }
+        .dark-square.valid-move-highlight::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--valid-move-highlight-bg);
+            z-index: 1;
+            pointer-events: none;
+            border-radius: 0;
+        }
+
+        .piece.piece-can-make-compulsory-jump {
+            animation: pulse-shadow-gold 1.5s infinite ease-in-out;
+        }
+
+        @keyframes pulse-shadow-gold {
+            0% { box-shadow: inset 0 -3px 4px rgba(0,0,0,0.15), 0 2px 3px rgba(0,0,0,0.2), 0 0 4px 1px var(--king-crown-color); }
+            50% { box-shadow: inset 0 -3px 4px rgba(0,0,0,0.15), 0 2px 3px rgba(0,0,0,0.2), 0 0 12px 4px var(--king-crown-color); }
+            100% { box-shadow: inset 0 -3px 4px rgba(0,0,0,0.15), 0 2px 3px rgba(0,0,0,0.2), 0 0 4px 1px var(--king-crown-color); }
+        }
+        .white-piece.piece-can-make-compulsory-jump {
+            animation: pulse-shadow-gold-white 1.5s infinite ease-in-out;
+        }
+        @keyframes pulse-shadow-gold-white {
+            0% { box-shadow: inset 0 -3px 4px rgba(0,0,0,0.15), 0 2px 3px rgba(0,0,0,0.2), 0 0 4px 1px var(--king-crown-color); }
+            50% { box-shadow: inset 0 -3px 4px rgba(0,0,0,0.15), 0 2px 3px rgba(0,0,0,0.2), 0 0 12px 4px var(--king-crown-color); }
+            100% { box-shadow: inset 0 -3px 4px rgba(0,0,0,0.15), 0 2px 3px rgba(0,0,0,0.2), 0 0 4px 1px var(--king-crown-color); }
+        }
+        .black-piece.piece-can-make-compulsory-jump {
+            animation: pulse-shadow-gold-black 1.5s infinite ease-in-out;
+        }
+        @keyframes pulse-shadow-gold-black {
+            0% { box-shadow: inset 0 -3px 4px rgba(0,0,0,0.2), 0 2px 3px rgba(0,0,0,0.3), 0 0 4px 1px var(--king-crown-color); }
+            50% { box-shadow: inset 0 -3px 4px rgba(0,0,0,0.2), 0 2px 3px rgba(0,0,0,0.3), 0 0 12px 4px var(--king-crown-color); }
+            100% { box-shadow: inset 0 -3px 4px rgba(0,0,0,0.2), 0 2px 3px rgba(0,0,0,0.3), 0 0 4px 1px var(--king-crown-color); }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="info-panel">
+            <div class="info-panel-top-content">
+                <h1>Draughts</h1>
+                <div class="player-setup">
+                    <div>
+                        <label for="player1NameInput">Player 1 Name:</label>
+                        <input type="text" id="player1NameInput" value="Player 1">
+                    </div>
+                    <div>
+                        <label for="player2NameInput">Player 2 Name:</label>
+                        <input type="text" id="player2NameInput" value="Player 2">
+                    </div>
+                </div>
+                <div id="gameInfo">
+                    <span id="turnInfo"></span>
+                    <span id="playerRoleInfo"></span>
+                </div>
+                <div class="message-area" id="messageArea">Game messages will appear here.</div>
+                <div class="buttons-container">
+                    <button id="startGameButton">Start Game</button>
+                    <button id="resetScoresButton">Reset Scores</button>
+                    <button id="toggleHighlightsButton">Highlights: ON</button>
+                    <button id="toggleAutoJumpButton">Auto-Jump: OFF</button> 
+                </div>
+                <div class="speed-slider-container">
+                    <label for="autoMoveSpeedSlider">Auto-Move Speed</label>
+                    <div class="slider-labels">
+                        <span class="fast-label">Fast</span>
+                        <span class="slow-label">Slow</span>
+                    </div>
+                    <input type="range" id="autoMoveSpeedSlider" min="250" max="2000" value="500">
+                </div>
+                 <div class="concede-buttons-container">
+                    <button id="player1ConcedeButton" style="display:none;">P1 Concedes</button>
+                    <button id="player2ConcedeButton" style="display:none;">P2 Concedes</button>
+                </div>
+                <div id="coinFlipDisplay" style="visibility: hidden;">
+                    <div id="coinElement">
+                        <div class="coin-face white-side">WHITE</div>
+                        <div class="coin-face black-side">BLACK</div>
+                    </div>
+                    <p id="coinFlipResultText"></p>
+                </div>
+            </div>
+            <div id="scoreBoard">
+                <h3>Scores</h3>
+                <p><span id="p1NameDisplayScore">Player 1</span>: <span id="player1Score">0</span></p>
+                <p><span id="p2NameDisplayScore">Player 2</span>: <span id="player2Score">0</span></p>
+            </div>
+        </div>
+        <div class="board-panel">
+            <div id="gameBoard"></div>
+        </div>
+    </div>
+
+    <script>
+        const EMPTY = 0;
+        const P_WHITE_MAN = 1;
+        const P_WHITE_KING = 11;
+        const P_BLACK_MAN = 2;
+        const P_BLACK_KING = 22;
+
+        const WHITE_PLAYER_COLOR_ID = 100;
+        const BLACK_PLAYER_COLOR_ID = 200;
+
+        const ROWS = 8;
+        const COLS = 8;
+
+        let board = [];
+        let playerNames = { player1: "Player 1", player2: "Player 2" };
+        let playerAssignments = { player1: null, player2: null };
+        let currentPlayerPlayingAs = null;
+        let activePlayerInputId = 'player1';
+
+        let isGameOver = true;
+        let gameActuallyStarted = false;
+        let coinFlipInProgress = false;
+
+        let scores = { player1: 0, player2: 0 };
+        let highlightValidMoves = true;
+        let autoCompulsoryMoveEnabled = false; 
+        let autoMoveInProgress = false; 
+        let autoMoveDelay = 500; 
+
+        let selectedPieceInfo = null;
+        let currentValidMoves = [];
+        let mustMakeJumpGlobal = false; 
+        let pieceContinuingJump = null;
+        let messageClearTimer = null;
+
+        // Flags for player name input 'clear on first click' behavior
+        let player1NameInputFirstClick = true;
+        let player2NameInputFirstClick = true;
+
+
+        const gameBoardElement = document.getElementById('gameBoard');
+        const turnInfoElement = document.getElementById('turnInfo');
+        const playerRoleInfoElement = document.getElementById('playerRoleInfo');
+        const messageAreaElement = document.getElementById('messageArea');
+        const startGameButton = document.getElementById('startGameButton');
+        const resetScoresButton = document.getElementById('resetScoresButton');
+        const toggleHighlightsButton = document.getElementById('toggleHighlightsButton');
+        const toggleAutoJumpButton = document.getElementById('toggleAutoJumpButton'); 
+        const autoMoveSpeedSlider = document.getElementById('autoMoveSpeedSlider'); 
+        const player1NameInputEl = document.getElementById('player1NameInput');
+        const player2NameInputEl = document.getElementById('player2NameInput');
+        const p1NameDisplayScoreEl = document.getElementById('p1NameDisplayScore');
+        const p2NameDisplayScoreEl = document.getElementById('p2NameDisplayScore');
+        const player1ScoreEl = document.getElementById('player1Score');
+        const player2ScoreEl = document.getElementById('player2Score');
+        const player1ConcedeButton = document.getElementById('player1ConcedeButton');
+        const player2ConcedeButton = document.getElementById('player2ConcedeButton');
+
+        const coinFlipDisplayEl = document.getElementById('coinFlipDisplay');
+        const coinElementEl = document.getElementById('coinElement');
+        const coinFlipResultTextEl = document.getElementById('coinFlipResultText');
+
+        function isPieceMine(pieceType) {
+            if (!currentPlayerPlayingAs) return false; 
+            if (currentPlayerPlayingAs === WHITE_PLAYER_COLOR_ID) {
+                return pieceType === P_WHITE_MAN || pieceType === P_WHITE_KING;
+            } else if (currentPlayerPlayingAs === BLACK_PLAYER_COLOR_ID) {
+                return pieceType === P_BLACK_MAN || pieceType === P_BLACK_KING;
+            }
+            return false;
+        }
+
+        function initializeBoardState() {
+            board = [];
+            for (let r = 0; r < ROWS; r++) {
+                board[r] = [];
+                for (let c = 0; c < COLS; c++) {
+                    if ((r + c) % 2 !== 0) {
+                        if (r < 3) { board[r][c] = P_BLACK_MAN; }
+                        else if (r > 4) { board[r][c] = P_WHITE_MAN; }
+                        else { board[r][c] = EMPTY; }
+                    } else { board[r][c] = EMPTY; }
+                }
+            }
+        }
+
+        function renderBoard() {
+            gameBoardElement.innerHTML = '';
+            if (gameBoardElement.clientWidth > 0) {
+                const boardSize = gameBoardElement.clientWidth;
+                const cellSize = boardSize / COLS;
+                document.documentElement.style.setProperty('--board-cell-size', `${cellSize}px`);
+            }
+
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const square = document.createElement('div');
+                    square.classList.add('square');
+                    square.dataset.row = r;
+                    square.dataset.col = c;
+                    if ((r + c) % 2 === 0) { square.classList.add('light-square'); }
+                    else { square.classList.add('dark-square'); square.addEventListener('click', () => handleSquareClick(r, c));}
+                    const pieceType = board[r][c];
+                    if (pieceType !== EMPTY) {
+                        const pieceElement = document.createElement('div');
+                        pieceElement.classList.add('piece');
+                        if (pieceType === P_WHITE_MAN || pieceType === P_WHITE_KING) {pieceElement.classList.add('white-piece');}
+                        else {pieceElement.classList.add('black-piece');}
+                        if (pieceType === P_WHITE_KING || pieceType === P_BLACK_KING) {pieceElement.classList.add('king');}
+                        square.appendChild(pieceElement);
+                    }
+                    gameBoardElement.appendChild(square);
+                }
+            }
+            if (selectedPieceInfo) { 
+                 const newSelectedElement = gameBoardElement.querySelector(`[data-row='${selectedPieceInfo.row}'][data-col='${selectedPieceInfo.col}'] .piece`);
+                 if(newSelectedElement) newSelectedElement.classList.add('selected-piece-style');
+            }
+            updateMoveHighlightsAndMessages(); 
+        }
+        
+        function initiateAutoMoveSequence(fromR, fromC, moveDetails) {
+            if (autoMoveInProgress || !autoCompulsoryMoveEnabled || isGameOver || !gameActuallyStarted) {
+                return; 
+            }
+
+            autoMoveInProgress = true;
+            messageAreaElement.textContent = "Auto-jumping...";
+            
+            setTimeout(() => {
+                autoMoveInProgress = false;
+                if (!autoCompulsoryMoveEnabled || isGameOver || !gameActuallyStarted) {
+                    if (!isGameOver && gameActuallyStarted) {
+                        updateMoveHighlightsAndMessages(); 
+                    } else if (isGameOver || !gameActuallyStarted) {
+                         if(messageAreaElement.textContent === "Auto-jumping...") messageAreaElement.textContent = "";
+                    }
+                    return;
+                }
+                makeMove(fromR, fromC, moveDetails.to_row, moveDetails.to_col, moveDetails.is_jump, moveDetails.jumped_squares);
+            }, autoMoveDelay); 
+        }
+
+
+        function handleSquareClick(r, c) {
+            if (isGameOver || coinFlipInProgress || !gameActuallyStarted || autoMoveInProgress) return;
+
+            const clearMessage = (specificMsg = null, delay = 2500) => {
+                if (messageClearTimer) clearTimeout(messageClearTimer);
+                messageClearTimer = setTimeout(() => {
+                    if (autoMoveInProgress) return; 
+                    if (!isGameOver && gameActuallyStarted && (!specificMsg || messageAreaElement.textContent === specificMsg)) {
+                        const nextPlayerMustJumpCheck = checkForAnyCompulsoryJump(currentPlayerPlayingAs); 
+                        if (!nextPlayerMustJumpCheck || (nextPlayerMustJumpCheck && !messageAreaElement.textContent.includes("Compulsory"))) {
+                             if(!messageAreaElement.textContent.includes("King!") && !messageAreaElement.textContent.includes("WINS!")) messageAreaElement.textContent = "";
+                        } else if (nextPlayerMustJumpCheck) {
+                             if(!messageAreaElement.textContent.includes("King!") && !messageAreaElement.textContent.includes("WINS!")) messageAreaElement.textContent = "Compulsory Jump available! Select a highlighted piece.";
+                        }
+                    }
+                }, delay);
+            };
+
+            if (pieceContinuingJump && selectedPieceInfo && (selectedPieceInfo.row !== pieceContinuingJump.row || selectedPieceInfo.col !==pieceContinuingJump.col)) {
+                 messageAreaElement.textContent = "Must continue jump sequence with the current piece.";
+                 clearMessage("Must continue jump sequence with the current piece.");
+                 return;
+            }
+            if (pieceContinuingJump && selectedPieceInfo && selectedPieceInfo.row === pieceContinuingJump.row && selectedPieceInfo.col === pieceContinuingJump.col) {
+                const isValidContinuationJumpTarget = currentValidMoves.find(move => move.to_row === r && move.to_col === c && move.is_jump);
+                if(isValidContinuationJumpTarget){
+                     makeMove(selectedPieceInfo.row, selectedPieceInfo.col, r, c, isValidContinuationJumpTarget.is_jump, isValidContinuationJumpTarget.jumped_squares);
+                } else {
+                    messageAreaElement.textContent = "Must continue jump sequence with this piece.";
+                    clearMessage("Must continue jump sequence with this piece.");
+                }
+                return;
+            }
+
+            const clickedPieceType = board[r][c];
+
+            if (selectedPieceInfo) { 
+                const isValidMoveTarget = currentValidMoves.find(move => move.to_row === r && move.to_col === c);
+                if (isValidMoveTarget) {
+                    makeMove(selectedPieceInfo.row, selectedPieceInfo.col, r, c, isValidMoveTarget.is_jump, isValidMoveTarget.jumped_squares);
+                } else { 
+                    clearAllHighlights(); 
+                    if (isPieceMine(clickedPieceType)) {
+                        selectPiece(r, c, clickedPieceType); 
+                    } else {
+                        updateMoveHighlightsAndMessages(); 
+                    }
+                }
+            } else { 
+                if (isPieceMine(clickedPieceType)) {
+                    selectPiece(r, c, clickedPieceType);
+                }
+            }
+        }
+
+        function selectPiece(r, c, pieceType) {
+            if (autoMoveInProgress) return; 
+
+            clearAllHighlights(); 
+            
+            const pieceElement = gameBoardElement.querySelector(`[data-row='${r}'][data-col='${c}'] .piece`);
+            selectedPieceInfo = { pieceType, row: r, col: c, element: pieceElement };
+            if (selectedPieceInfo.element) {
+                selectedPieceInfo.element.classList.add('selected-piece-style');
+            }
+            
+            updateMoveHighlightsAndMessages(); 
+
+            if (autoCompulsoryMoveEnabled && !isGameOver && gameActuallyStarted && selectedPieceInfo) {
+                if (mustMakeJumpGlobal && currentValidMoves.length === 1 && currentValidMoves[0].is_jump) {
+                    initiateAutoMoveSequence(selectedPieceInfo.row, selectedPieceInfo.col, currentValidMoves[0]);
+                }
+            }
+        }
+
+        function clearAllHighlights() {
+            const currentlySelected = gameBoardElement.querySelector('.selected-piece-style');
+            if (currentlySelected) currentlySelected.classList.remove('selected-piece-style');
+            selectedPieceInfo = null;
+
+            document.querySelectorAll('.valid-move-highlight').forEach(el => el.classList.remove('valid-move-highlight'));
+            currentValidMoves = [];
+
+            document.querySelectorAll('.piece-can-make-compulsory-jump').forEach(el => {
+                el.classList.remove('piece-can-make-compulsory-jump');
+                el.classList.remove('pulse-shadow-gold-white');
+                el.classList.remove('pulse-shadow-gold-black');
+            });
+        }
+
+
+        function getOpponentPieceTypes(playerColor) {
+            if (playerColor === WHITE_PLAYER_COLOR_ID) {
+                return [P_BLACK_MAN, P_BLACK_KING];
+            } else {
+                return [P_WHITE_MAN, P_WHITE_KING];
+            }
+        }
+
+        function calculateValidMovesForPiece(r, c, pieceType, forGlobalCheckOnly = false) {
+            const isKing = pieceType === P_WHITE_KING || pieceType === P_BLACK_KING;
+            const pieceOwnerColor = (pieceType === P_WHITE_MAN || pieceType === P_WHITE_KING) ? WHITE_PLAYER_COLOR_ID : BLACK_PLAYER_COLOR_ID;
+            const forwardDir = (pieceOwnerColor === WHITE_PLAYER_COLOR_ID) ? -1 : 1;
+            const opponentPieceTypes = getOpponentPieceTypes(pieceOwnerColor);
+            const directions = isKing ? [forwardDir, -forwardDir] : [forwardDir];
+
+            const jumpsForThisPiece = [];
+            for (const dir of directions) {
+                for (const dc of [-1, 1]) {
+                    const jr = r + dir;      
+                    const jc = c + dc;
+                    const lr = r + dir * 2;  
+                    const lc = c + dc * 2;
+                    if (lr >= 0 && lr < ROWS && lc >= 0 && lc < COLS && board[lr][lc] === EMPTY &&
+                        jr >= 0 && jr < ROWS && jc >= 0 && jc < COLS && opponentPieceTypes.includes(board[jr][jc])) {
+                        jumpsForThisPiece.push({ to_row: lr, to_col: lc, is_jump: true, jumped_squares: [{row: jr, col: jc}] });
+                    }
+                }
+            }
+
+            if (forGlobalCheckOnly) {
+                return jumpsForThisPiece; 
+            }
+
+            if (jumpsForThisPiece.length > 0) {
+                return jumpsForThisPiece; 
+            }
+            
+            const ownerHasCompulsoryJumpAnywhere = checkForAnyCompulsoryJump(pieceOwnerColor);
+            if (ownerHasCompulsoryJumpAnywhere) { 
+                return []; 
+            }
+
+            const simpleMoves = [];
+            for (const dir of directions) {
+                for (const dc of [-1, 1]) {
+                    const nr = r + dir;
+                    const nc = c + dc;
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && board[nr][nc] === EMPTY) {
+                        simpleMoves.push({ to_row: nr, to_col: nc, is_jump: false, jumped_squares: [] });
+                    }
+                }
+            }
+            return simpleMoves;
+        }
+
+        function checkForAnyCompulsoryJump(playerColor) {
+            if (!gameActuallyStarted || isGameOver) return false;
+            for (let r_idx = 0; r_idx < ROWS; r_idx++) {
+                for (let c_idx = 0; c_idx < COLS; c_idx++) {
+                    const piece = board[r_idx][c_idx];
+                    if (piece === EMPTY) continue;
+                    const pieceIsWhite = piece === P_WHITE_MAN || piece === P_WHITE_KING;
+                    const pieceIsBlack = piece === P_BLACK_MAN || piece === P_BLACK_KING;
+
+                    if ((playerColor === WHITE_PLAYER_COLOR_ID && pieceIsWhite) ||
+                        (playerColor === BLACK_PLAYER_COLOR_ID && pieceIsBlack)) {
+                        const jumps = calculateValidMovesForPiece(r_idx, c_idx, piece, true);
+                        if (jumps.length > 0) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function highlightPiecesWithCompulsoryJumpOptions(playerColor) {
+            if (!gameActuallyStarted || isGameOver) return;
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const pieceTypeOnSquare = board[r][c];
+                    if (pieceTypeOnSquare === EMPTY) continue;
+
+                    let pieceIsOfPlayerColor = false;
+                    if (playerColor === WHITE_PLAYER_COLOR_ID && (pieceTypeOnSquare === P_WHITE_MAN || pieceTypeOnSquare === P_WHITE_KING)) {
+                        pieceIsOfPlayerColor = true;
+                    } else if (playerColor === BLACK_PLAYER_COLOR_ID && (pieceTypeOnSquare === P_BLACK_MAN || pieceTypeOnSquare === P_BLACK_KING)) {
+                        pieceIsOfPlayerColor = true;
+                    }
+
+                    if (pieceIsOfPlayerColor) {
+                        if (selectedPieceInfo && selectedPieceInfo.row === r && selectedPieceInfo.col === c) {
+                            continue;
+                        }
+
+                        const jumps = calculateValidMovesForPiece(r, c, pieceTypeOnSquare, true);
+                        if (jumps.length > 0) {
+                            const pieceEl = gameBoardElement.querySelector(`.square[data-row='${r}'][data-col='${c}'] .piece`);
+                            if (pieceEl) {
+                                pieceEl.classList.add('piece-can-make-compulsory-jump');
+                                if (pieceEl.classList.contains('white-piece')) {
+                                    pieceEl.classList.add('pulse-shadow-gold-white');
+                                } else if (pieceEl.classList.contains('black-piece')) {
+                                     pieceEl.classList.add('pulse-shadow-gold-black');
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+
+        function updateMoveHighlightsAndMessages() {
+            if (autoMoveInProgress) { 
+                showValidMoveHighlights(); 
+                return;
+            }
+
+            document.querySelectorAll('.piece-can-make-compulsory-jump').forEach(el => {
+                el.classList.remove('piece-can-make-compulsory-jump');
+                el.classList.remove('pulse-shadow-gold-white');
+                el.classList.remove('pulse-shadow-gold-black');
+            });
+
+
+            mustMakeJumpGlobal = checkForAnyCompulsoryJump(currentPlayerPlayingAs);
+
+            if (selectedPieceInfo) {
+                currentValidMoves = calculateValidMovesForPiece(selectedPieceInfo.row, selectedPieceInfo.col, selectedPieceInfo.pieceType, false);
+                
+                if (mustMakeJumpGlobal) {
+                    if (!currentValidMoves.some(move => move.is_jump)) { 
+                        messageAreaElement.textContent = "Another piece must jump! Select a highlighted piece.";
+                        highlightPiecesWithCompulsoryJumpOptions(currentPlayerPlayingAs);
+                    } else { 
+                         if (!messageAreaElement.textContent.includes("Multi-jump") && 
+                            !(autoCompulsoryMoveEnabled && currentValidMoves.length === 1 && currentValidMoves[0].is_jump)) {
+                            messageAreaElement.textContent = "Compulsory Jump!";
+                        }
+                    }
+                } else { 
+                    if (currentValidMoves.length === 0) {
+                    } else if (messageAreaElement.textContent.includes("Compulsory") || messageAreaElement.textContent.includes("Another piece must jump")) {
+                        messageAreaElement.textContent = ""; 
+                    }
+                }
+            } else { 
+                currentValidMoves = []; 
+                if (mustMakeJumpGlobal) {
+                    messageAreaElement.textContent = "Compulsory Jump available! Select a highlighted piece.";
+                    highlightPiecesWithCompulsoryJumpOptions(currentPlayerPlayingAs);
+                } else {
+                    if (gameActuallyStarted && !isGameOver && !messageAreaElement.textContent.includes("WINS!") && !messageAreaElement.textContent.includes("King!")) {
+                         if(messageAreaElement.textContent.includes("Compulsory") || messageAreaElement.textContent.includes("Another piece must jump") || messageAreaElement.textContent.includes("Select a highlighted piece"))
+                         messageAreaElement.textContent = "";
+                    }
+                }
+            }
+            showValidMoveHighlights(); 
+        }
+
+
+        function showValidMoveHighlights() {
+            document.querySelectorAll('.dark-square.valid-move-highlight').forEach(el => el.classList.remove('valid-move-highlight'));
+            
+            if(highlightValidMoves && currentValidMoves.length > 0){
+                currentValidMoves.forEach(move => {
+                    const squareEl = gameBoardElement.querySelector(`.square[data-row='${move.to_row}'][data-col='${move.to_col}']`);
+                    if (squareEl) squareEl.classList.add('valid-move-highlight');
+                });
+            }
+        }
+
+        function handleCapture(jumpedSquares) {
+            if (jumpedSquares && jumpedSquares.length > 0) {
+                jumpedSquares.forEach(sq => { board[sq.row][sq.col] = EMPTY; });
+            }
+        }
+
+        function checkForKing(row, col) {
+            const pieceType = board[row][col];
+            let madeKing = false;
+            if (pieceType === P_WHITE_MAN && row === 0) {
+                board[row][col] = P_WHITE_KING;
+                madeKing = true;
+            } else if (pieceType === P_BLACK_MAN && row === ROWS - 1) {
+                board[row][col] = P_BLACK_KING;
+                madeKing = true;
+            }
+            return madeKing;
+        }
+
+        function makeMove(fromR, fromC, toR, toC, isJump, jumpedSquares) {
+            if (autoMoveInProgress && selectedPieceInfo && fromR === selectedPieceInfo.row && fromC === selectedPieceInfo.col) {
+            } else if (autoMoveInProgress) {
+            }
+            
+            if (mustMakeJumpGlobal && !isJump && !pieceContinuingJump && !autoCompulsoryMoveEnabled && !autoMoveInProgress) { 
+                messageAreaElement.textContent = "You must make a jump!";
+                setTimeout(() => { if(!isGameOver && gameActuallyStarted && messageAreaElement.textContent === "You must make a jump!") messageAreaElement.textContent = "";}, 2500);
+                return;
+            }
+
+            const pieceToMove = board[fromR][fromC];
+            board[toR][toC] = pieceToMove;
+            board[fromR][fromC] = EMPTY;
+            let pieceMadeKingThisTurn = false;
+            let currentMessageBeforeKingOrCapture = messageAreaElement.textContent; 
+
+            clearAllHighlights(); 
+            const tempSelectedPieceForMultiJump = { pieceType: board[toR][toC], row: toR, col: toC };
+
+
+            if (isJump) {
+                handleCapture(jumpedSquares);
+                const furtherJumps = calculateValidMovesForPiece(tempSelectedPieceForMultiJump.row, tempSelectedPieceForMultiJump.col, tempSelectedPieceForMultiJump.pieceType, true);
+
+                if (furtherJumps.length > 0) {
+                    pieceContinuingJump = { row: toR, col: toC }; 
+                    renderBoard(); 
+
+                    selectPiece(toR, toC, board[toR][toC]); 
+                    
+                    if (!autoMoveInProgress && !autoCompulsoryMoveEnabled || (autoCompulsoryMoveEnabled && furtherJumps.length > 1) ) {
+                         if(!messageAreaElement.textContent.includes("Auto-jumping...")) messageAreaElement.textContent = "Multi-jump available!";
+                    }
+                    return; 
+                }
+            }
+            pieceContinuingJump = null; 
+
+            if (checkForKing(toR, toC)) {
+                pieceMadeKingThisTurn = true;
+            }
+            
+            if (!autoMoveInProgress) clearAllHighlights();
+
+
+            if (!autoMoveInProgress) { 
+                if (pieceMadeKingThisTurn) {
+                    const kingedPlayerName = activePlayerInputId === 'player1' ? playerNames.player1 : playerNames.player2;
+                    messageAreaElement.textContent = `${kingedPlayerName} got a King!`;
+                } else if (isJump && !currentMessageBeforeKingOrCapture.includes("Multi-jump") && !currentMessageBeforeKingOrCapture.includes("Auto-jumping...")) {
+                    messageAreaElement.textContent = "Piece captured!";
+                } else if (messageAreaElement.textContent === "Auto-jumping...") {
+                    const opponentColorAfterAuto = (currentPlayerPlayingAs === WHITE_PLAYER_COLOR_ID) ? BLACK_PLAYER_COLOR_ID : WHITE_PLAYER_COLOR_ID;
+                    const nextPlayerMustJumpAfterAuto = checkForAnyCompulsoryJump(opponentColorAfterAuto);
+                    if (nextPlayerMustJumpAfterAuto && !isGameOver) {
+                    } else {
+                        messageAreaElement.textContent = ""; 
+                    }
+                }
+            }
+            
+            renderBoard(); 
+
+            const opponentColor = (currentPlayerPlayingAs === WHITE_PLAYER_COLOR_ID) ? BLACK_PLAYER_COLOR_ID : WHITE_PLAYER_COLOR_ID;
+            if (checkEndGameConditions(opponentColor)) {
+                return; 
+            }
+            
+            if (!autoMoveInProgress && (pieceMadeKingThisTurn || (isJump && !currentMessageBeforeKingOrCapture.includes("Multi-jump")))) {
+                 setTimeout(() => {
+                    // Message update for next turn is handled by switchTurn calling updateMoveHighlightsAndMessages
+                 }, 2000);
+            }
+            switchTurn();
+        }
+
+        function checkAndTriggerProactiveAutoJump() {
+            if (!autoCompulsoryMoveEnabled || !gameActuallyStarted || isGameOver || autoMoveInProgress || coinFlipInProgress) {
+                return false;
+            }
+
+            const playerHasCompulsoryJump = checkForAnyCompulsoryJump(currentPlayerPlayingAs);
+            if (!playerHasCompulsoryJump) {
+                return false; 
+            }
+
+            let potentialAutoJumpPieces = [];
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const pieceType = board[r][c];
+                    if (pieceType === EMPTY) continue;
+
+                    let pieceIsCurrentPlayers = false;
+                    if (currentPlayerPlayingAs === WHITE_PLAYER_COLOR_ID && (pieceType === P_WHITE_MAN || pieceType === P_WHITE_KING)) {
+                        pieceIsCurrentPlayers = true;
+                    } else if (currentPlayerPlayingAs === BLACK_PLAYER_COLOR_ID && (pieceType === P_BLACK_MAN || pieceType === P_BLACK_KING)) {
+                        pieceIsCurrentPlayers = true;
+                    }
+
+                    if (pieceIsCurrentPlayers) {
+                        const jumpsForThisPiece = calculateValidMovesForPiece(r, c, pieceType, true); 
+                        if (jumpsForThisPiece.length > 0) {
+                            potentialAutoJumpPieces.push({ r, c, pieceType, jumps: jumpsForThisPiece });
+                        }
+                    }
+                }
+            }
+
+            if (potentialAutoJumpPieces.length === 1) { 
+                const thePieceToAutoJump = potentialAutoJumpPieces[0];
+                if (thePieceToAutoJump.jumps.length === 1) { 
+                    selectPiece(thePieceToAutoJump.r, thePieceToAutoJump.c, thePieceToAutoJump.pieceType);
+                    return true; 
+                }
+            }
+            return false; 
+        }
+
+
+        function switchTurn() {
+            if (pieceContinuingJump || isGameOver || autoMoveInProgress) return; 
+
+            const playerWhoJustMovedColor = currentPlayerPlayingAs;
+            let playerWhoJustMovedKey;
+            if(playerAssignments.player1 === playerWhoJustMovedColor) playerWhoJustMovedKey = 'player1';
+            else playerWhoJustMovedKey = 'player2';
+
+            activePlayerInputId = (activePlayerInputId === 'player1') ? 'player2' : 'player1';
+            currentPlayerPlayingAs = (currentPlayerPlayingAs === WHITE_PLAYER_COLOR_ID) ? BLACK_PLAYER_COLOR_ID : WHITE_PLAYER_COLOR_ID;
+            
+            clearAllHighlights(); 
+            updateGameInfo(); 
+
+            if (!canPlayerMakeAnyMove(currentPlayerPlayingAs)) {
+                if (!isGameOver) { 
+                    endGame(playerWhoJustMovedKey);
+                }
+                return; 
+            }
+
+            if (checkAndTriggerProactiveAutoJump()) {
+                return; 
+            }
+            
+            updateMoveHighlightsAndMessages(); 
+        }
+
+        function countPlayerPieces(playerColor) {
+            let count = 0;
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const piece = board[r][c];
+                    if (playerColor === WHITE_PLAYER_COLOR_ID && (piece === P_WHITE_MAN || piece === P_WHITE_KING)) count++;
+                    else if (playerColor === BLACK_PLAYER_COLOR_ID && (piece === P_BLACK_MAN || piece === P_BLACK_KING)) count++;
+                }
+            }
+            return count;
+        }
+
+        function canPlayerMakeAnyMove(playerColor) {
+            if (countPlayerPieces(playerColor) === 0) return false; 
+
+            for (let r_idx = 0; r_idx < ROWS; r_idx++) {
+                for (let c_idx = 0; c_idx < COLS; c_idx++) {
+                    const pieceType = board[r_idx][c_idx];
+                    if (pieceType === EMPTY) continue;
+
+                    const pieceIsWhite = pieceType === P_WHITE_MAN || pieceType === P_WHITE_KING;
+                    const pieceIsBlack = pieceType === P_BLACK_MAN || pieceType === P_BLACK_KING;
+                    let pieceBelongsToPlayer = false;
+
+                    if (playerColor === WHITE_PLAYER_COLOR_ID && pieceIsWhite) pieceBelongsToPlayer = true;
+                    if (playerColor === BLACK_PLAYER_COLOR_ID && pieceIsBlack) pieceBelongsToPlayer = true;
+
+                    if (pieceBelongsToPlayer) {
+                        const moves = calculateValidMovesForPiece(r_idx, c_idx, pieceType, false);
+                        if (moves.length > 0) return true; 
+                    }
+                }
+            }
+            return false; 
+        }
+
+
+        function checkEndGameConditions(playerColorToCheckIfLost) {
+            if (isGameOver) return false;
+
+            let opponentKey; 
+            if (playerAssignments.player1 === playerColorToCheckIfLost) {
+                opponentKey = 'player2';
+            } else if (playerAssignments.player2 === playerColorToCheckIfLost) {
+                opponentKey = 'player1';
+            } else {
+                console.error("Could not determine opponent for end game check.");
+                return false; 
+            }
+
+            const pieceCount = countPlayerPieces(playerColorToCheckIfLost);
+            if (pieceCount === 0) {
+                endGame(opponentKey); 
+                return true;
+            }
+
+            if (!canPlayerMakeAnyMove(playerColorToCheckIfLost)) {
+                endGame(opponentKey); 
+                return true;
+            }
+            return false;
+        }
+
+        function endGame(winningPlayerKey) {
+            if(isGameOver) return; 
+
+            isGameOver = true;
+            gameActuallyStarted = false;
+            pieceContinuingJump = null;
+            autoMoveInProgress = false; 
+            clearAllHighlights();
+
+            const winnerName = playerNames[winningPlayerKey];
+            const winnerColorId = playerAssignments[winningPlayerKey];
+            const winnerColorText = winnerColorId === WHITE_PLAYER_COLOR_ID ? "White" : "Black";
+
+            scores[winningPlayerKey]++;
+            updateScoreDisplay();
+
+            turnInfoElement.textContent = "Game Over!";
+            messageAreaElement.textContent = `${winnerName} (${winnerColorText}) WINS!`;
+
+            startGameButton.textContent = "Play Again?";
+            startGameButton.disabled = false;
+            resetScoresButton.disabled = false;
+            toggleHighlightsButton.disabled = false;
+            toggleAutoJumpButton.disabled = false;
+            autoMoveSpeedSlider.disabled = false;
+            player1ConcedeButton.style.display = 'none';
+            player2ConcedeButton.style.display = 'none';
+        }
+
+        function handleConcede(concedingPlayerKey) {
+            if (isGameOver || !gameActuallyStarted || autoMoveInProgress) return;
+            const concederName = playerNames[concedingPlayerKey];
+            if (window.confirm(`${concederName}, are you sure you want to concede?`)) {
+                const winningPlayerKey = (concedingPlayerKey === 'player1') ? 'player2' : 'player1';
+                endGame(winningPlayerKey);
+            }
+        }
+        player1ConcedeButton.addEventListener('click', () => handleConcede('player1'));
+        player2ConcedeButton.addEventListener('click', () => handleConcede('player2'));
+
+        function toggleHighlightSetting() {
+            if (autoMoveInProgress) return;
+            highlightValidMoves = !highlightValidMoves;
+            toggleHighlightsButton.textContent = `Highlights: ${highlightValidMoves ? 'ON' : 'OFF'}`;
+            updateMoveHighlightsAndMessages(); 
+        }
+        toggleHighlightsButton.addEventListener('click', toggleHighlightSetting);
+
+        function toggleAutoCompulsoryMove() {
+            if (coinFlipInProgress || autoMoveInProgress) return; 
+            autoCompulsoryMoveEnabled = !autoCompulsoryMoveEnabled;
+            toggleAutoJumpButton.textContent = `Auto-Jump: ${autoCompulsoryMoveEnabled ? 'ON' : 'OFF'}`;
+
+            if (!autoCompulsoryMoveEnabled && autoMoveInProgress) { 
+                autoMoveInProgress = false; 
+                updateMoveHighlightsAndMessages(); 
+            } else if (autoCompulsoryMoveEnabled && gameActuallyStarted && !isGameOver) { 
+                if (!checkAndTriggerProactiveAutoJump() && selectedPieceInfo) {
+                     if (mustMakeJumpGlobal && currentValidMoves.length === 1 && currentValidMoves[0].is_jump) {
+                        initiateAutoMoveSequence(selectedPieceInfo.row, selectedPieceInfo.col, currentValidMoves[0]);
+                    }
+                } else if (!selectedPieceInfo) { 
+                    updateMoveHighlightsAndMessages(); 
+                }
+            }
+        }
+        toggleAutoJumpButton.addEventListener('click', toggleAutoCompulsoryMove);
+
+
+        function updateGameInfo() {
+            if (isGameOver || !gameActuallyStarted) {
+                if(!isGameOver && !coinFlipInProgress) {
+                     turnInfoElement.textContent = 'Game Not Started';
+                     playerRoleInfoElement.textContent = '';
+                } else if (!isGameOver && coinFlipInProgress) {
+                    turnInfoElement.textContent = '';
+                    playerRoleInfoElement.textContent = '';
+                }
+                return;
+            }
+            const currentActivePlayerName = activePlayerInputId === 'player1' ? playerNames.player1 : playerNames.player2;
+            const colorText = currentPlayerPlayingAs === WHITE_PLAYER_COLOR_ID ? "White" : "Black";
+            turnInfoElement.textContent = `${currentActivePlayerName} (${colorText}) to move.`;
+
+            let p1Role = playerAssignments.player1 === WHITE_PLAYER_COLOR_ID ? "White" : (playerAssignments.player1 === BLACK_PLAYER_COLOR_ID ? "Black" : "Unassigned");
+            let p2Role = playerAssignments.player2 === WHITE_PLAYER_COLOR_ID ? "White" : (playerAssignments.player2 === BLACK_PLAYER_COLOR_ID ? "Black" : "Unassigned");
+            if(playerAssignments.player1 && playerAssignments.player2){
+                 playerRoleInfoElement.textContent = `${playerNames.player1} is ${p1Role}, ${playerNames.player2} is ${p2Role}.`;
+            } else {
+                playerRoleInfoElement.textContent = 'Roles to be assigned post-flip.';
+            }
+        }
+        function updatePlayerNameDisplays() {
+            playerNames.player1 = player1NameInputEl.value.trim() || "Player 1";
+            playerNames.player2 = player2NameInputEl.value.trim() || "Player 2";
+            p1NameDisplayScoreEl.textContent = playerNames.player1;
+            p2NameDisplayScoreEl.textContent = playerNames.player2;
+            if(gameActuallyStarted && !isGameOver) updateGameInfo();
+        }
+        player1NameInputEl.addEventListener('input', updatePlayerNameDisplays);
+        player2NameInputEl.addEventListener('input', updatePlayerNameDisplays);
+
+        function updateScoreDisplay() {
+            player1ScoreEl.textContent = scores.player1;
+            player2ScoreEl.textContent = scores.player2;
+        }
+
+        function executeCoinFlipDraughts() {
+            if (coinFlipInProgress) return;
+            updatePlayerNameDisplays();
+
+            player1NameInputEl.disabled = true;
+            player2NameInputEl.disabled = true;
+            coinFlipInProgress = true;
+            gameActuallyStarted = false;
+            isGameOver = true; 
+            autoMoveInProgress = false; 
+
+            startGameButton.disabled = true;
+            startGameButton.textContent = "Flipping...";
+            resetScoresButton.disabled = true;
+            toggleHighlightsButton.disabled = true;
+            toggleAutoJumpButton.disabled = true;
+            autoMoveSpeedSlider.disabled = true;
+            player1ConcedeButton.style.display = 'none';
+            player2ConcedeButton.style.display = 'none';
+
+            turnInfoElement.textContent = '';
+            playerRoleInfoElement.textContent = '';
+            messageAreaElement.style.visibility = 'hidden';
+            coinFlipDisplayEl.style.visibility = 'visible';
+            coinFlipResultTextEl.textContent = 'Flipping to see who plays White...';
+
+            const player1GetsWhite = Math.random() < 0.5;
+            const baseSpins = 3;
+            let targetRotationDegrees = baseSpins * 360; 
+            if (!player1GetsWhite) targetRotationDegrees += 180; 
+
+
+            coinElementEl.style.transition = 'none';
+            coinElementEl.style.transform = 'rotateY(0deg)';
+            void coinElementEl.offsetWidth; 
+
+            setTimeout(() => {
+                coinElementEl.style.transition = 'transform 1.2s cubic-bezier(0.45, 0.05, 0.55, 0.95)';
+                coinElementEl.style.transform = `rotateY(${targetRotationDegrees}deg)`;
+            }, 20);
+
+            setTimeout(() => {
+                if (player1GetsWhite) { 
+                    playerAssignments.player1 = WHITE_PLAYER_COLOR_ID;
+                    playerAssignments.player2 = BLACK_PLAYER_COLOR_ID;
+                    activePlayerInputId = 'player1'; 
+                    coinFlipResultTextEl.textContent = `${playerNames.player1} plays White and starts!`;
+                } else { 
+                    playerAssignments.player2 = WHITE_PLAYER_COLOR_ID;
+                    playerAssignments.player1 = BLACK_PLAYER_COLOR_ID;
+                    activePlayerInputId = 'player2'; 
+                    coinFlipResultTextEl.textContent = `${playerNames.player2} plays White and starts!`;
+                }
+                currentPlayerPlayingAs = WHITE_PLAYER_COLOR_ID; 
+
+                setTimeout(() => {
+                    coinFlipInProgress = false;
+                    gameActuallyStarted = true;
+                    isGameOver = false; 
+                    
+                    clearAllHighlights();
+                    initializeBoardState();
+                    renderBoard(); 
+                    updateGameInfo();
+
+
+                    startGameButton.textContent = "Restart Game";
+                    startGameButton.disabled = false;
+                    resetScoresButton.disabled = false;
+                    toggleHighlightsButton.disabled = false;
+                    toggleAutoJumpButton.disabled = false;
+                    autoMoveSpeedSlider.disabled = false;
+                    player1ConcedeButton.textContent = `${playerNames.player1} Concedes`;
+                    player2ConcedeButton.textContent = `${playerNames.player2} Concedes`;
+                    player1ConcedeButton.style.display = 'inline-block';
+                    player2ConcedeButton.style.display = 'inline-block';
+                    coinFlipDisplayEl.style.visibility = 'hidden';
+                    messageAreaElement.style.visibility = 'visible';
+
+                    if (!canPlayerMakeAnyMove(currentPlayerPlayingAs)) {
+                        if (!isGameOver) {
+                             const winnerKey = (playerAssignments.player1 === currentPlayerPlayingAs) ? 'player2' : 'player1';
+                             endGame(winnerKey); 
+                        }
+                    } else {
+                        if (!checkAndTriggerProactiveAutoJump()) {
+                             updateMoveHighlightsAndMessages(); 
+                        }
+                    }
+
+                }, 2000);
+            }, 1250);
+        }
+        startGameButton.addEventListener('click', () => {
+            if (coinFlipInProgress || autoMoveInProgress) return;
+            if(isGameOver || !gameActuallyStarted) { 
+                executeCoinFlipDraughts();
+            } else { 
+                 if(window.confirm("Are you sure you want to restart the current game? This will start a new coin flip.")) {
+                    executeCoinFlipDraughts();
+                 }
+            }
+        });
+
+        resetScoresButton.addEventListener('click', () => {
+            if (coinFlipInProgress || autoMoveInProgress) return;
+            if (window.confirm("Are you sure you want to reset all scores and start a new series?")) {
+                scores.player1 = 0;
+                scores.player2 = 0;
+                updateScoreDisplay();
+
+                isGameOver = true;
+                gameActuallyStarted = false;
+                coinFlipInProgress = false;
+                autoMoveInProgress = false;
+                
+                currentPlayerPlayingAs = null;
+                playerAssignments = { player1: null, player2: null };
+                activePlayerInputId = 'player1';
+
+                player1NameInputEl.disabled = false;
+                player1NameInputEl.value = "Player 1"; // Reset name field
+                player1NameInputFirstClick = true; // Reset flag for P1 name input
+                player2NameInputEl.disabled = false;
+                player2NameInputEl.value = "Player 2"; // Reset name field
+                player2NameInputFirstClick = true; // Reset flag for P2 name input
+                updatePlayerNameDisplays(); // Update internal names and scoreboard display
+
+
+                startGameButton.textContent = "Start Game";
+                startGameButton.disabled = false;
+                resetScoresButton.disabled = false;
+                toggleHighlightsButton.disabled = false;
+                toggleAutoJumpButton.disabled = false;
+                autoMoveSpeedSlider.disabled = true; 
+                toggleHighlightsButton.textContent = `Highlights: ${highlightValidMoves ? 'ON' : 'OFF'}`;
+                toggleAutoJumpButton.textContent = `Auto-Jump: ${autoCompulsoryMoveEnabled ? 'ON' : 'OFF'}`;
+
+                clearAllHighlights();
+                initializeBoardState();
+                renderBoard(); 
+                messageAreaElement.textContent = 'Enter names and click "Start Game".';
+                messageAreaElement.style.visibility = 'visible';
+                turnInfoElement.textContent = 'Game Not Started';
+                playerRoleInfoElement.textContent = '';
+                coinFlipDisplayEl.style.visibility = 'hidden';
+                player1ConcedeButton.style.display = 'none';
+                player2ConcedeButton.style.display = 'none';
+            }
+        });
+
+        autoMoveSpeedSlider.addEventListener('input', (event) => {
+            autoMoveDelay = parseInt(event.target.value, 10);
+        });
+
+        // Event listeners for player name input fields (clear on first click)
+        player1NameInputEl.addEventListener('focus', () => {
+            if (player1NameInputFirstClick && player1NameInputEl.value === "Player 1") {
+                player1NameInputEl.value = "";
+                player1NameInputFirstClick = false;
+            }
+        });
+        player2NameInputEl.addEventListener('focus', () => {
+            if (player2NameInputFirstClick && player2NameInputEl.value === "Player 2") {
+                player2NameInputEl.value = "";
+                player2NameInputFirstClick = false;
+            }
+        });
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeBoardState();
+            renderBoard(); 
+            isGameOver = true;
+            gameActuallyStarted = false;
+
+            messageAreaElement.textContent = 'Enter names and click "Start Game" for a coin toss.';
+            messageAreaElement.style.visibility = 'visible';
+            turnInfoElement.textContent = 'Game Not Started';
+            playerRoleInfoElement.textContent = '';
+            updatePlayerNameDisplays();
+            updateScoreDisplay();
+            coinFlipDisplayEl.style.visibility = 'hidden';
+            player1ConcedeButton.style.display = 'none';
+            player2ConcedeButton.style.display = 'none';
+            toggleHighlightsButton.textContent = `Highlights: ${highlightValidMoves ? 'ON' : 'OFF'}`;
+            toggleAutoJumpButton.textContent = `Auto-Jump: ${autoCompulsoryMoveEnabled ? 'ON' : 'OFF'}`;
+            autoMoveSpeedSlider.value = autoMoveDelay; 
+            autoMoveSpeedSlider.disabled = true; 
+            toggleAutoJumpButton.disabled = false; 
+            updateMoveHighlightsAndMessages(); 
+        });
+    </script>
+</body>
+</html>

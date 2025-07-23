@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibrant Connect 4 - Refined Coin Flip</title>
+    <style>
+        :root {
+            --board-bg: #0077cc; /* Deep blue */
+            --cell-bg: #ffffff;
+            --player1-color: #ffcc00; /* Bright Yellow */
+            --player1-shadow: #cca300;
+            --player2-color: #ff3333; /* Bright Red */
+            --player2-shadow: #cc2929;
+            --text-color: #333;
+            --highlight-color: #4CAF50; /* Green for wins/turn */
+            --button-bg: #ff9900; /* Orange */
+            --button-hover-bg: #e68a00;
+            --container-bg: rgba(255, 255, 255, 0.95);
+        }
+
+        body {
+            font-family: 'Arial Rounded MT Bold', 'Helvetica Rounded', Arial, sans-serif;
+            display: flex;
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            height: 100vh; 
+            margin: 0;
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: var(--text-color);
+            box-sizing: border-box;
+            overflow: hidden; 
+        }
+
+        .game-container {
+            display: flex;
+            width: 95vw; 
+            height: 95vh; 
+            background-color: var(--container-bg);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+            overflow: hidden; 
+        }
+
+        .info-panel {
+            flex-basis: 35%;
+            padding: 20px; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; 
+            background-color: rgba(0,0,0,0.02); 
+            border-right: 1px solid #ddd;
+            overflow-y: auto; 
+        }
+        
+        .info-panel-top-content {
+            display: flex;
+            flex-direction: column;
+            gap: 15px; 
+        }
+
+        .board-panel {
+            flex-basis: 65%; 
+            display: flex;
+            flex-direction: column; 
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative; 
+        }
+
+        h1 {
+            color: var(--board-bg);
+            margin-bottom: 10px; 
+            font-size: 2.2em; 
+            text-align: center;
+        }
+
+        .player-setup {
+            display: flex;
+            justify-content: space-around;
+            gap: 10px;
+            flex-wrap: wrap; 
+        }
+
+        .player-setup div {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .player-setup label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .player-setup input[type="text"] {
+            padding: 8px;
+            border: 2px solid var(--board-bg);
+            border-radius: 5px;
+            text-align: center;
+            font-size: 0.9em;
+            width: 110px;
+        }
+        .player-setup input[type="text"].player1-input { border-color: var(--player1-color); }
+        .player-setup input[type="text"].player2-input { border-color: var(--player2-color); }
+
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: clamp(3px, 0.8vmin, 6px); 
+            background-color: var(--board-bg);
+            padding: clamp(5px, 1.2vmin, 12px); 
+            border-radius: 10px;
+            border: clamp(3px, 0.7vmin, 6px) solid darken(var(--board-bg), 10%);
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+            width: 100%; 
+            max-width: 90vh; 
+            max-height: calc(100% - 40px); 
+            aspect-ratio: 7/6; 
+            margin: 0 auto; 
+        }
+
+        .cell {
+            background-color: var(--cell-bg);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            aspect-ratio: 1/1;
+            position: relative; 
+        }
+
+        .cell:hover:not(:has(.piece)) { 
+            background-color: #e0e0e0;
+        }
+        
+        .column-hover-indicator {
+            position: absolute;
+            top: -15px; 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 7px solid transparent; 
+            border-right: 7px solid transparent;
+            opacity: 0.7;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        #gameBoard .cell[data-row='0'] .column-hover-indicator { /* Styles applied by JS */ }
+        .column-hover-indicator.player1 { border-bottom: 10px solid var(--player1-color); }
+        .column-hover-indicator.player2 { border-bottom: 10px solid var(--player2-color); }
+
+        .piece {
+            width: 85%; height: 85%; border-radius: 50%;
+            box-shadow: inset 0 -3px 5px rgba(0,0,0,0.3), 0 2px 3px rgba(0,0,0,0.2);
+            animation: dropPiece 0.3s ease-out;
+        }
+        .player1 { background-color: var(--player1-color); }
+        .player2 { background-color: var(--player2-color); }
+        .winning-piece {
+            border: 3px solid gold; transform: scale(1.1);
+            box-shadow: 0 0 15px gold, inset 0 -3px 5px rgba(0,0,0,0.3), 0 2px 3px rgba(0,0,0,0.2);
+        }
+        @keyframes dropPiece {
+            0% { transform: translateY(-150px) scale(0.8); opacity: 0.5; } 
+            80% { transform: translateY(8px) scale(1.05); opacity: 1; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        #gameInfo { font-size: 1.1em; text-align: center; }
+        #turnInfo { font-weight: bold; }
+        #turnInfo.player1-turn { color: var(--player1-shadow); }
+        #turnInfo.player2-turn { color: var(--player2-shadow); }
+
+        #scoreBoard {
+            margin-top: auto; padding-top: 20px; border-top: 1px solid #eee;
+            text-align: center;
+            font-size: 1.5em; 
+        }
+        #scoreBoard h3 { margin-top: 0; margin-bottom: 10px; color: var(--board-bg); font-size: 0.8em; }
+        #scoreBoard p { margin: 5px 0; font-size: 0.7em; }
+        #scoreBoard span { font-weight: bold; }
+        .player1-score-name { color: var(--player1-shadow); } 
+        .player2-score-name { color: var(--player2-shadow); } 
+
+        .buttons-container { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+        button {
+            background-color: var(--button-bg); color: white; border: none;
+            padding: 10px 20px; font-size: 1em; border-radius: 8px; cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            flex-grow: 1; max-width: 150px; 
+        }
+        button:hover { background-color: var(--button-hover-bg); transform: translateY(-2px); }
+        button:active { transform: translateY(0px); }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #resetScoresButton { background-color: #aaa; }
+        #resetScoresButton:hover:not(:disabled) { background-color: #999; }
+
+        .message-area {
+            font-size: 1.2em; margin-top: 10px; font-weight: bold;
+            min-height: 25px; text-align: center;
+        }
+        .winner-message { color: var(--highlight-color); }
+        .draw-message { color: var(--board-bg); }
+
+        /* Coin Flip Styles */
+        #coinFlipDisplay {
+            /* display: none; /* Controlled by JS */
+            text-align: center;
+            margin-top: 15px; /* Space below buttons */
+            perspective: 1000px; 
+            min-height: 100px; /* Reserve space for coin and text */
+        }
+        #coinElement {
+            width: 70px;
+            height: 70px;
+            position: relative;
+            margin: 0 auto 10px auto;
+            transform-style: preserve-3d;
+            /* transition: transform 1.2s cubic-bezier(0.45, 0.05, 0.55, 0.95); /* Applied by JS */
+        }
+        .coin-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8em; 
+            font-weight: bold;
+            border: 3px solid #555;
+            box-sizing: border-box;
+        }
+        .coin-front-face { 
+            background-color: var(--player1-color);
+            color: #333; 
+        }
+        .coin-back-face { 
+            background-color: var(--player2-color);
+            color: white;
+            transform: rotateY(180deg);
+        }
+        #coinFlipResultText {
+            font-weight: bold;
+            font-size: 1.1em;
+            min-height: 1.2em; /* Reserve space for text */
+        }
+
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="info-panel">
+            <div class="info-panel-top-content">
+                <h1>Connect 4</h1>
+                <div class="player-setup">
+                    <div>
+                        <label for="player1Name">Player 1 (Yellow):</label>
+                        <input type="text" id="player1Name" class="player1-input" value="Player 1">
+                    </div>
+                    <div>
+                        <label for="player2Name">Player 2 (Red):</label>
+                        <input type="text" id="player2Name" class="player2-input" value="Player 2">
+                    </div>
+                </div>
+                <div id="gameInfo">
+                    <span id="turnInfo"></span>
+                </div>
+                <div class="message-area" id="messageArea"></div> 
+                <div class="buttons-container">
+                    <button id="startGameButton">Start Game</button>
+                    <button id="resetScoresButton">Reset Scores</button>
+                </div>
+                <div id="coinFlipDisplay" style="display: none;"> <!-- Moved here, under buttons -->
+                    <div id="coinElement">
+                        <div class="coin-face coin-front-face">P1</div>
+                        <div class="coin-face coin-back-face">P2</div>
+                    </div>
+                    <p id="coinFlipResultText"></p>
+                </div>
+            </div>
+            <div id="scoreBoard">
+                <h3>Scores:</h3>
+                <p><span id="p1NameDisplay" class="player1-score-name">Player 1</span>: <span id="player1Score">0</span></p>
+                <p><span id="p2NameDisplay" class="player2-score-name">Player 2</span>: <span id="player2Score">0</span></p>
+            </div>
+        </div>
+        <div class="board-panel">
+            <div id="gameBoard"></div>
+        </div>
+    </div>
+
+    <script>
+        const ROWS = 6;
+        const COLS = 7;
+        let board = []; 
+        let currentPlayer = 1; 
+        let gameOver = false;
+        let scores = { player1: 0, player2: 0 };
+        let playerNames = { player1: "Player 1", player2: "Player 2" };
+        
+        let coinFlipInProgress = false;
+        let gameActuallyStarted = false; 
+
+        const gameBoardElement = document.getElementById('gameBoard');
+        const turnInfoElement = document.getElementById('turnInfo');
+        const messageAreaElement = document.getElementById('messageArea');
+        const startGameButton = document.getElementById('startGameButton');
+        const resetScoresButton = document.getElementById('resetScoresButton');
+        const player1NameInput = document.getElementById('player1Name');
+        const player2NameInput = document.getElementById('player2Name');
+        const p1NameDisplay = document.getElementById('p1NameDisplay'); 
+        const p2NameDisplay = document.getElementById('p2NameDisplay'); 
+        const player1ScoreElement = document.getElementById('player1Score');
+        const player2ScoreElement = document.getElementById('player2Score'); 
+
+        const coinFlipDisplayElement = document.getElementById('coinFlipDisplay');
+        const coinElement = document.getElementById('coinElement');
+        const coinFlipResultTextElement = document.getElementById('coinFlipResultText');
+
+        function updatePlayerNames() { /* ... (same) ... */ }
+        player1NameInput.addEventListener('input', updatePlayerNames); 
+        player2NameInput.addEventListener('input', updatePlayerNames);
+        function createBoard() { /* ... (same) ... */ }
+        function highlightColumnIndicator(col, show) { /* ... (same) ... */ }
+        gameBoardElement.addEventListener('mouseover', (event) => { /* ... (same) ... */ });
+        gameBoardElement.addEventListener('mouseout', (event) => { /* ... (same) ... */ });
+        function handleCellClick(col) { /* ... (same, includes gameActuallyStarted check) ... */ }
+        function checkWin(r, c) { /* ... (same) ... */ }
+        function highlightWinningPieces() { /* ... (same) ... */ }
+        function updateTurnInfo() { /* ... (same, includes gameActuallyStarted check) ... */ }
+        function updateScoreDisplay() { /* ... (same) ... */ }
+        
+        // Minor content updates for functions from previous generation
+        function updatePlayerNames() {
+            playerNames.player1 = player1NameInput.value.trim() || "Player 1";
+            playerNames.player2 = player2NameInput.value.trim() || "Player 2";
+            p1NameDisplay.textContent = playerNames.player1;
+            p2NameDisplay.textContent = playerNames.player2;
+            if (!gameOver && !coinFlipInProgress && gameActuallyStarted) {
+                 updateTurnInfo();
+            }
+        }
+        function createBoard() {
+            gameBoardElement.innerHTML = ''; 
+            board = [];
+            for (let r = 0; r < ROWS; r++) {
+                const rowArray = [];
+                for (let c = 0; c < COLS; c++) {
+                    rowArray.push(0); 
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    cell.addEventListener('click', () => handleCellClick(c));
+                    if (r === 0) {
+                        const hoverIndicator = document.createElement('div');
+                        hoverIndicator.classList.add('column-hover-indicator');
+                        hoverIndicator.style.display = 'none'; 
+                        cell.appendChild(hoverIndicator);
+                    }
+                    gameBoardElement.appendChild(cell);
+                }
+                board.push(rowArray);
+            }
+        }
+        function highlightColumnIndicator(col, show) { 
+            if (gameOver && show || coinFlipInProgress || !gameActuallyStarted) return; 
+            const allIndicators = gameBoardElement.querySelectorAll('.column-hover-indicator');
+            allIndicators.forEach(ind => ind.style.display = 'none');
+            if (show) {
+                const topCellInCol = gameBoardElement.querySelector(`.cell[data-row='0'][data-col='${col}']`);
+                if (topCellInCol) {
+                    const indicator = topCellInCol.querySelector('.column-hover-indicator');
+                    if (indicator) {
+                        indicator.className = 'column-hover-indicator'; 
+                        indicator.classList.add(currentPlayer === 1 ? 'player1' : 'player2');
+                        indicator.style.display = 'block';
+                    }
+                }
+            }
+        }
+        gameBoardElement.addEventListener('mouseover', (event) => { 
+            const cell = event.target.closest('.cell');
+            if (cell && !gameOver && !coinFlipInProgress && gameActuallyStarted) {
+                const col = parseInt(cell.dataset.col);
+                highlightColumnIndicator(col, true);
+            }
+        });
+        gameBoardElement.addEventListener('mouseout', (event) => { 
+            const cell = event.target.closest('.cell');
+            if (cell) { 
+                const col = parseInt(cell.dataset.col);
+                let relatedTargetIsOutsideColumn = true;
+                if (event.relatedTarget) {
+                    const relatedCell = event.relatedTarget.closest('.cell');
+                    if (relatedCell && parseInt(relatedCell.dataset.col) === col) {
+                        relatedTargetIsOutsideColumn = false; 
+                    }
+                }
+                if (relatedTargetIsOutsideColumn) {
+                    highlightColumnIndicator(col, false);
+                }
+            } else if (!event.relatedTarget || !gameBoardElement.contains(event.relatedTarget)) {
+                const allIndicators = gameBoardElement.querySelectorAll('.column-hover-indicator');
+                allIndicators.forEach(ind => ind.style.display = 'none');
+            }
+        });
+         function handleCellClick(col) {
+            if (coinFlipInProgress || !gameActuallyStarted || gameOver) return;
+            
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (board[r][col] === 0) {
+                    board[r][col] = currentPlayer;
+                    const cellElement = gameBoardElement.querySelector(`.cell[data-row='${r}'][data-col='${col}']`);
+                    const existingIndicator = cellElement.querySelector('.column-hover-indicator');
+                    if(existingIndicator) existingIndicator.style.display = 'none';
+                    const piece = document.createElement('div');
+                    piece.classList.add('piece', `player${currentPlayer}`);
+                    cellElement.appendChild(piece); 
+                    if (checkWin(r, col)) {
+                        gameOver = true;
+                        gameActuallyStarted = false; 
+                        messageAreaElement.textContent = `${playerNames[`player${currentPlayer}`]} Wins! 🎉`;
+                        messageAreaElement.className = 'message-area winner-message';
+                        scores[`player${currentPlayer}`]++;
+                        updateScoreDisplay();
+                        startGameButton.textContent = "Play Again?";
+                        highlightWinningPieces(); 
+                        highlightColumnIndicator(col, false); 
+                    } else if (board.flat().every(cellVal => cellVal !== 0)) { 
+                        gameOver = true;
+                        gameActuallyStarted = false; 
+                        messageAreaElement.textContent = "It's a Draw! 🤝";
+                        messageAreaElement.className = 'message-area draw-message';
+                        startGameButton.textContent = "Play Again?";
+                        highlightColumnIndicator(col, false); 
+                    } else {
+                        currentPlayer = currentPlayer === 1 ? 2 : 1;
+                        updateTurnInfo();
+                    }
+                    return; 
+                }
+            }
+            messageAreaElement.textContent = "Column is full! Try another.";
+            messageAreaElement.className = 'message-area';
+            setTimeout(() => { if (!gameOver && gameActuallyStarted) messageAreaElement.textContent = ''; }, 2000);
+        }
+        function checkWin(r, c) { 
+            const player = board[r][c];
+            if (player === 0) return false;
+            const directions = [
+                { dr: 0, dc: 1 }, { dr: 1, dc: 0 }, { dr: 1, dc: 1 }, { dr: 1, dc: -1 }
+            ];
+            for (const { dr, dc } of directions) {
+                let count = 1;
+                let currentWinningCells = [{r,c}];
+                for (let i = 1; i < 4; i++) {
+                    const nr = r + dr * i, nc = c + dc * i;
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && board[nr][nc] === player) {
+                        count++; currentWinningCells.push({r: nr, c: nc});
+                    } else break;
+                }
+                for (let i = 1; i < 4; i++) {
+                    const nr = r - dr * i, nc = c - dc * i;
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && board[nr][nc] === player) {
+                        count++; currentWinningCells.push({r: nr, c: nc});
+                    } else break;
+                }
+                if (count >= 4) {
+                    board.winningCells = currentWinningCells; 
+                    return true;
+                }
+            }
+            return false;
+        }
+        function highlightWinningPieces() { 
+            if (board.winningCells && Array.isArray(board.winningCells)) {
+                board.winningCells.forEach(pos => {
+                    const cell = gameBoardElement.querySelector(`.cell[data-row='${pos.r}'][data-col='${pos.c}']`);
+                    if (cell && cell.firstChild && cell.firstChild.classList.contains('piece')) { 
+                         cell.firstChild.classList.add('winning-piece');
+                    }
+                });
+            }
+        }
+        function updateTurnInfo() {
+            if (gameOver || coinFlipInProgress || !gameActuallyStarted) {
+                turnInfoElement.textContent = '';
+                const allIndicators = gameBoardElement.querySelectorAll('.column-hover-indicator');
+                allIndicators.forEach(ind => ind.style.display = 'none');
+                return;
+            }
+            turnInfoElement.textContent = `${playerNames[`player${currentPlayer}`]}'s Turn`;
+            turnInfoElement.className = `player${currentPlayer}-turn`; 
+        }
+        function updateScoreDisplay() { 
+            player1ScoreElement.textContent = scores.player1;
+            player2ScoreElement.textContent = scores.player2;
+        }
+
+
+        function resetGame(isFullReset = false) {
+            gameOver = false;
+            
+            if (isFullReset) {
+                scores.player1 = 0;
+                scores.player2 = 0;
+                player1NameInput.disabled = false;
+                player2NameInput.disabled = false;
+                startGameButton.textContent = "Start Game";
+                gameActuallyStarted = false; 
+                currentPlayer = 1; 
+            } else { // Post coin flip or new round setup
+                player1NameInput.disabled = true;
+                player2NameInput.disabled = true;
+                startGameButton.textContent = "Restart Game";
+                gameActuallyStarted = true; 
+            }
+            
+            messageAreaElement.textContent = ''; 
+            messageAreaElement.className = 'message-area'; // Clear any win/draw classes
+            messageAreaElement.style.display = 'block'; // Ensure it's visible
+            coinFlipDisplayElement.style.display = 'none'; // Hide coin flip area
+
+            createBoard(); 
+            updatePlayerNames(); 
+            updateScoreDisplay(); 
+            if(gameActuallyStarted) updateTurnInfo(); else turnInfoElement.textContent = '';
+        }
+
+        function fullReset() {
+            resetGame(true); 
+        }
+        
+        function executeCoinFlip() {
+            if (coinFlipInProgress) return;
+
+            updatePlayerNames(); 
+
+            player1NameInput.disabled = true;
+            player2NameInput.disabled = true;
+            coinFlipInProgress = true;
+            gameActuallyStarted = false;
+            gameOver = false; 
+
+            startGameButton.disabled = true;
+            startGameButton.textContent = "Flipping...";
+            
+            messageAreaElement.style.display = 'none'; // Hide regular message area
+            coinFlipDisplayElement.style.display = 'block'; // Show coin flip display
+            coinFlipResultTextElement.textContent = 'Flipping...';
+            
+            // Determine winner BEFORE animation starts
+            const tossWinner = Math.random() < 0.5 ? 1 : 2; // 1 for P1 (Heads/Front), 2 for P2 (Tails/Back)
+            // currentPlayer will be set after animation, before resetGame
+
+            const baseSpins = 5; // Number of full 360deg spins for visual effect
+            let targetRotationDegrees = baseSpins * 360;
+
+            if (tossWinner === 2) { // P2 (Back face) wins
+                targetRotationDegrees += 180; // Ensure it lands on the back face
+            }
+            // If P1 wins, it will naturally end on the front face after even full spins.
+
+            // Instantly reset coin to starting visual state (front face, no rotation)
+            coinElement.style.transition = 'none'; 
+            coinElement.style.transform = 'rotateY(0deg)'; 
+            
+            // Force reflow/repaint before applying the animation transition
+            void coinElement.offsetWidth; 
+
+            // Start the animation to the calculated final state
+            setTimeout(() => { 
+                coinElement.style.transition = 'transform 1.2s cubic-bezier(0.45, 0.05, 0.55, 0.95)'; 
+                coinElement.style.transform = `rotateY(${targetRotationDegrees}deg)`; 
+            }, 20); // Tiny delay to ensure transition applies after reset
+
+            // After flip animation duration
+            setTimeout(() => {
+                currentPlayer = tossWinner; // Set the starting player
+                coinFlipResultTextElement.textContent = `${playerNames[`player${currentPlayer}`]} (${currentPlayer === 1 ? 'P1 Yellow' : 'P2 Red'}) wins the toss & starts!`;
+
+                // Proceed to game after showing result
+                setTimeout(() => {
+                    coinFlipInProgress = false;
+                    resetGame(false); // Prepare board for the determined starting player
+                                      // gameActuallyStarted will be set to true within resetGame
+                    
+                    startGameButton.textContent = "Restart Game";
+                    startGameButton.disabled = false;
+                    // updateTurnInfo() is called within resetGame if gameActuallyStarted
+                }, 2000); // Show result for 2 seconds
+
+            }, 1250); // Animation duration (1.2s) + small buffer (20ms + 1200ms = 1220ms, so 1250 is safe)
+        }
+
+        startGameButton.addEventListener('click', () => {
+            if (coinFlipInProgress) return;
+            executeCoinFlip();
+        });
+
+        resetScoresButton.addEventListener('click', fullReset);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updatePlayerNames(); 
+            createBoard(); 
+            updateScoreDisplay();
+            coinFlipDisplayElement.style.display = 'none'; // Ensure it's hidden on load
+            messageAreaElement.textContent = 'Click "Start Game" for a coin toss to begin!';
+        });
+        
+    </script>
+</body>
+</html>
