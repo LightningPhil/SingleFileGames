@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON HORIZON | COCKPIT EDITION</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #050510;
+            --primary: #00f2ff;   
+            --secondary: #bc13fe; 
+            --alert: #ff0055;     
+            --gold: #ffd700;
+        }
+
+        body {
+            margin: 0; overflow: hidden; background-color: var(--bg-dark);
+            font-family: 'Rajdhani', sans-serif; user-select: none;
+        }
+
+        canvas { display: block; }
+
+        /* UI OVERLAY - CURVED VISOR STYLE */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; 
+            box-shadow: inset 0 0 100px rgba(0, 242, 255, 0.1);
+        }
+
+        .hud-wrapper {
+            display: flex; justify-content: space-between; padding: 30px; 
+            width: 100%; position: absolute; top: 0;
+        }
+        
+        .hud-element {
+            background: rgba(0, 20, 30, 0.8);
+            border: 1px solid var(--primary);
+            border-bottom: 4px solid var(--primary);
+            padding: 10px 25px;
+            color: var(--primary);
+            font-family: 'Orbitron';
+            font-size: 1.5rem;
+            text-shadow: 0 0 10px var(--primary);
+            transform: skewX(-15deg);
+            backdrop-filter: blur(4px);
+        }
+
+        .hud-label { font-size: 0.7rem; color: #fff; display: block; margin-bottom: 2px; font-family: 'Rajdhani'; letter-spacing: 2px; opacity: 0.8; }
+        .score-box { border-color: var(--gold); color: var(--gold); text-shadow: 0 0 10px var(--gold); }
+
+        /* RETICLE */
+        .crosshair {
+            position: absolute; top: 50%; left: 50%; width: 40px; height: 40px;
+            transform: translate(-50%, -50%); 
+            border: 2px solid rgba(0, 242, 255, 0.6); 
+            border-radius: 50%;
+            transition: all 0.1s;
+        }
+        /* Center Dot */
+        .crosshair::after {
+            content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; 
+            background: #fff; transform: translate(-50%, -50%); border-radius: 50%;
+            box-shadow: 0 0 10px #fff;
+        }
+        /* Wings */
+        .crosshair::before {
+            content: ''; position: absolute; top: 50%; left: 50%; width: 100px; height: 2px; 
+            background: rgba(0, 242, 255, 0.3); transform: translate(-50%, -50%);
+        }
+
+        .crosshair.locked { 
+            border-color: var(--alert); 
+            box-shadow: 0 0 30px var(--alert); 
+            width: 60px; height: 60px;
+            border-width: 3px;
+        }
+
+        /* SCREENS */
+        #load-screen, #crash-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100; pointer-events: auto; transition: opacity 0.5s;
+        }
+        #crash-screen { display: none; background: rgba(20, 0, 5, 0.95); }
+
+        .title {
+            font-family: 'Orbitron'; font-size: 5rem;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            font-weight: 800; text-shadow: 0 0 40px rgba(0, 242, 255, 0.4);
+            margin-bottom: 10px; letter-spacing: 6px; text-align: center;
+            font-style: italic;
+        }
+
+        .controls-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 40px 0;
+            background: rgba(0, 20, 30, 0.8); padding: 40px; border: 1px solid var(--primary);
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.1);
+        }
+        .key-row { color: #fff; font-size: 1.2rem; }
+        .key { color: var(--gold); font-weight: bold; font-family: 'Orbitron'; margin-right: 15px; }
+
+        .btn {
+            background: var(--primary); color: #000; border: none;
+            padding: 20px 60px; font-family: 'Orbitron'; font-size: 1.8rem; cursor: pointer;
+            transition: 0.2s; text-transform: uppercase; font-weight: bold; clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
+        }
+        .btn:hover { background: #fff; box-shadow: 0 0 50px var(--primary); transform: scale(1.05); }
+
+        /* LEADERBOARD */
+        .leaderboard-container { margin-top: 30px; width: 500px; border: 2px solid var(--secondary); padding: 25px; background: #000; }
+        .lb-title { color: var(--secondary); font-family: 'Orbitron'; text-align: center; margin-bottom: 20px; font-size: 1.5rem; }
+        .lb-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-family: 'Press Start 2P', cursive; font-size: 0.9rem; color: #fff; }
+        .lb-rank { color: var(--gold); }
+        
+        #name-input-section { display: none; flex-direction: column; align-items: center; margin-bottom: 30px; }
+        #player-name { 
+            background: transparent; border: none; border-bottom: 3px solid var(--primary); 
+            color: #fff; font-family: 'Orbitron'; font-size: 3rem; text-align: center; 
+            outline: none; text-transform: uppercase; width: 300px; margin-bottom: 15px;
+        }
+
+        .blink { animation: blinker 0.2s step-end infinite alternate; }
+        @keyframes blinker { 50% { opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div class="hud-wrapper">
+            <div class="hud-element">
+                <span class="hud-label">VELOCITY</span>
+                <span id="hud-speed">0</span>
+            </div>
+            <div class="hud-element score-box">
+                <span class="hud-label">SCORE</span>
+                <span id="hud-score">000000</span>
+            </div>
+            <div class="hud-element" style="border-color: var(--secondary); color: var(--secondary);">
+                <span class="hud-label">ALTITUDE</span>
+                <span id="hud-alt">0</span>
+            </div>
+        </div>
+        <div class="crosshair" id="crosshair"></div>
+    </div>
+
+    <!-- LOAD SCREEN -->
+    <div id="load-screen">
+        <div class="title">NEON HORIZON<br><span style="font-size: 2rem; color: #ffd700;">COCKPIT EDITION</span></div>
+        <div style="color: var(--primary); letter-spacing: 2px; font-weight:bold;">SYSTEMS ONLINE // FPV LINK ESTABLISHED</div>
+        
+        <div class="controls-grid">
+            <div class="key-row"><span class="key">W / S</span> PITCH</div>
+            <div class="key-row"><span class="key">A / D</span> YAW (SLOW)</div>
+            <div class="key-row"><span class="key">Q / E</span> ROLL (FAST)</div>
+            <div class="key-row"><span class="key">SPACE</span> CANNONS</div>
+            <div class="key-row"><span class="key">SHIFT</span> AFTERBURNER</div>
+            <div class="key-row"><span class="key">CTRL</span> BRAKE</div>
+        </div>
+
+        <button class="btn" onclick="startGame()">ENTER COCKPIT</button>
+    </div>
+
+    <!-- CRASH SCREEN -->
+    <div id="crash-screen">
+        <div class="title" style="color: var(--alert); -webkit-text-fill-color: var(--alert);">SIGNAL LOST</div>
+        
+        <div id="name-input-section">
+            <div class="blink" style="color: var(--gold); font-family: 'Orbitron'; font-size: 1.5rem; margin-bottom: 10px;">ACE PILOT DETECTED</div>
+            <input type="text" id="player-name" maxlength="3" placeholder="___" autofocus>
+            <button class="btn" style="padding: 10px 30px; font-size: 1rem;" onclick="saveScore()">LOG DATA</button>
+        </div>
+
+        <div class="leaderboard-container">
+            <div class="lb-title">FLIGHT RECORDER</div>
+            <div id="lb-list"></div>
+        </div>
+
+        <div style="margin-top: 30px;">
+            <button class="btn" onclick="resetGame()">EJECT / RETRY</button>
+        </div>
+    </div>
+
+<script>
+    // --- CONFIGURATION ---
+    const CONFIG = {
+        baseSpeed: 1.8, maxSpeed: 5.0, brakeSpeed: 0.8,
+        
+        // Realistic Flight Model
+        maxPitchRate: 0.045,
+        maxYawRate: 0.015,  // Yaw is slow (use rudder for fine aim)
+        maxRollRate: 0.07,  // Roll is fast (bank to turn)
+        
+        rotationAccel: 0.05, // Heavy feel
+        rotationDamp: 0.08,
+
+        chunkSize: 400, renderDistance: 5, buildingCount: 25, 
+        spawnMinTime: 800, spawnMaxTime: 2500, despawnDist: 4000,
+
+        laserSpeed: 25, laserRange: 200,
+        
+        colors: {
+            bg: 0x050510, grid: 0xbc13fe, building: 0x00f2ff, player: 0xffffff, laser: 0x00ff00
+        }
+    };
+
+    const CAR_TIERS = {
+        BRONZE: { color: 0xcd7f32, scale: 2.0, speedMult: 0.5, score: 50, engineColor: 0xff8800, altMin: 150, altMax: 300 },
+        SILVER: { color: 0xe0e0e0, scale: 1.4, speedMult: 1.0, score: 100, engineColor: 0x00f2ff, altMin: 60, altMax: 150 },
+        GOLD: { color: 0xffd700, scale: 0.9, speedMult: 1.8, score: 200, engineColor: 0xff0055, altMin: 20, altMax: 60 }
+    };
+
+    // --- AUDIO ENGINE ---
+    const AudioEngine = {
+        ctx: null, masterGain: null, musicGain: null,
+        isPlaying: false, nextNoteTime: 0, beatCount: 0,
+        bassLine: [44, 44, 55, 44, 38, 38, 44, 38], // Dark Synthwave
+        leadArp: [352, 440, 523.25, 698.46, 523.25, 440, 352, 261.63],
+
+        init: function() {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioContext();
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.value = 0.4;
+            this.masterGain.connect(this.ctx.destination);
+            this.musicGain = this.ctx.createGain();
+            this.musicGain.connect(this.masterGain);
+        },
+        startMusic: function() {
+            if(!this.ctx) this.init();
+            if(this.ctx.state === 'suspended') this.ctx.resume();
+            this.isPlaying = true;
+            this.nextNoteTime = this.ctx.currentTime + 0.1;
+            this.beatCount = 0;
+            this.scheduler();
+        },
+        stopMusic: function() { this.isPlaying = false; },
+        scheduler: function() {
+            if (!this.isPlaying) return;
+            const tempo = 135;
+            const secondsPerBeat = 60.0 / tempo;
+            while (this.nextNoteTime < this.ctx.currentTime + 0.1) {
+                this.playBeat(this.nextNoteTime, this.beatCount);
+                this.nextNoteTime += secondsPerBeat / 4; 
+                this.beatCount++;
+            }
+            setTimeout(() => this.scheduler(), 25);
+        },
+        playBeat: function(time, beat) {
+            const sixteenth = beat % 16;
+            if (sixteenth % 4 === 0) this.playKick(time);
+            if (sixteenth === 4 || sixteenth === 12) this.playSnare(time);
+            this.playHat(time, sixteenth % 2 === 0);
+            if (sixteenth % 2 === 0) {
+                const noteIdx = Math.floor((beat / 8) % this.bassLine.length);
+                this.playBass(time, this.bassLine[noteIdx]);
+            }
+            const arpIdx = beat % this.leadArp.length;
+            this.playLead(time, this.leadArp[arpIdx]);
+        },
+        playKick: function(time) {
+            const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+            osc.frequency.setValueAtTime(150, time); osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.5);
+            gain.gain.setValueAtTime(0.8, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
+            osc.connect(gain); gain.connect(this.musicGain); osc.start(time); osc.stop(time + 0.5);
+        },
+        playSnare: function(time) {
+            const bufferSize = this.ctx.sampleRate * 0.2; const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            const noise = this.ctx.createBufferSource(); noise.buffer = buffer;
+            const filter = this.ctx.createBiquadFilter(); filter.type = 'highpass'; filter.frequency.value = 1000;
+            const gain = this.ctx.createGain(); gain.gain.setValueAtTime(0.4, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+            noise.connect(filter); filter.connect(gain); gain.connect(this.musicGain); noise.start(time);
+        },
+        playHat: function(time, accent) {
+            const bufferSize = this.ctx.sampleRate * 0.05; const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            const noise = this.ctx.createBufferSource(); noise.buffer = buffer;
+            const filter = this.ctx.createBiquadFilter(); filter.type = 'highpass'; filter.frequency.value = 5000;
+            const gain = this.ctx.createGain(); gain.gain.setValueAtTime(accent ? 0.15 : 0.05, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
+            noise.connect(filter); filter.connect(gain); gain.connect(this.musicGain); noise.start(time);
+        },
+        playBass: function(time, freq) {
+            const osc = this.ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = freq;
+            const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.setValueAtTime(600, time); filter.frequency.exponentialRampToValueAtTime(100, time + 0.2);
+            const gain = this.ctx.createGain(); gain.gain.setValueAtTime(0.5, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.25);
+            osc.connect(filter); filter.connect(gain); gain.connect(this.musicGain); osc.start(time); osc.stop(time + 0.25);
+        },
+        playLead: function(time, freq) {
+            const osc = this.ctx.createOscillator(); osc.type = 'triangle'; osc.frequency.value = freq;
+            const gain = this.ctx.createGain(); gain.gain.setValueAtTime(0.08, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+            osc.connect(gain); gain.connect(this.musicGain); osc.start(time); osc.stop(time + 0.1);
+        },
+        sfxLaser: function() {
+            if(!this.ctx) return;
+            const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+            osc.frequency.setValueAtTime(800, this.ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+            osc.connect(gain); gain.connect(this.masterGain); osc.start(); osc.stop(this.ctx.currentTime + 0.1);
+        },
+        sfxExplosion: function() {
+            if(!this.ctx) return;
+            const bufferSize = this.ctx.sampleRate * 1.0; const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            const noise = this.ctx.createBufferSource(); noise.buffer = buffer;
+            const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.setValueAtTime(800, this.ctx.currentTime); filter.frequency.linearRampToValueAtTime(100, this.ctx.currentTime + 0.8);
+            const gain = this.ctx.createGain(); gain.gain.setValueAtTime(1.0, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 1.0);
+            noise.connect(filter); filter.connect(gain); gain.connect(this.masterGain); noise.start();
+        },
+        sfxCrash: function() { if(!this.ctx) return; this.stopMusic(); this.sfxExplosion(); }
+    };
+
+    // --- GLOBALS ---
+    let scene, camera, renderer;
+    let player, cockpitGroup;
+    let terrainChunks = {};
+    let activeBuildings = []; 
+    let traffic = [];
+    let lasers = [];
+    let particles = [];
+    let score = 0;
+    
+    let isPlaying = false;
+    let isCrashed = false;
+    let lastShotTime = 0;
+    let currentSpeed = 0;
+    let spawnTimeout = null;
+
+    // Flight Dynamics
+    let currentPitchRate = 0;
+    let currentYawRate = 0;
+    let currentRollRate = 0;
+
+    const keys = { w: false, s: false, a: false, d: false, q: false, e: false, Shift: false, ' ': false, Control: false };
+    
+    const hudSpeed = document.getElementById('hud-speed');
+    const hudAlt = document.getElementById('hud-alt');
+    const hudScore = document.getElementById('hud-score');
+    const crosshair = document.getElementById('crosshair');
+
+    // --- INIT ---
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(CONFIG.colors.bg);
+        scene.fog = new THREE.FogExp2(CONFIG.colors.bg, 0.0012);
+
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 8000); 
+        
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        scene.add(ambientLight);
+
+        createPlayerAndCockpit();
+        updateChunks();
+        updateLeaderboardDisplay();
+
+        window.addEventListener('resize', onWindowResize, false);
+        document.addEventListener('keydown', (e) => onKey(e, true));
+        document.addEventListener('keyup', (e) => onKey(e, false));
+
+        animate();
+    }
+
+    function createPlayerAndCockpit() {
+        // PLAYER (Physics Body) - Invisible container
+        player = new THREE.Group();
+        player.position.set(0, 100, 0);
+        scene.add(player);
+
+        // COCKPIT (Visuals attached to player)
+        cockpitGroup = new THREE.Group();
+        player.add(cockpitGroup);
+
+        // Add Camera to Cockpit
+        cockpitGroup.add(camera);
+
+        // --- CONSTRUCT COCKPIT GEOMETRY ---
+        const mat = new THREE.LineBasicMaterial({ color: CONFIG.colors.player, transparent: true, opacity: 0.5 });
+        const hardMat = new THREE.LineBasicMaterial({ color: CONFIG.colors.primary, linewidth: 2 });
+
+        // 1. Dashboard Console
+        const dashGeo = new THREE.BoxGeometry(3, 1, 1.5);
+        const dash = new THREE.LineSegments(new THREE.EdgesGeometry(dashGeo), mat);
+        dash.position.set(0, -1.2, -1.5);
+        cockpitGroup.add(dash);
+
+        // 2. Canopy Arches
+        const archPoints = [];
+        for(let i=0; i<=10; i++) {
+            const t = i/10 * Math.PI;
+            archPoints.push(new THREE.Vector3(Math.cos(t)*2.5, Math.sin(t)*1.5, -1));
+        }
+        const archGeo = new THREE.BufferGeometry().setFromPoints(archPoints);
+        const arch = new THREE.Line(archGeo, hardMat);
+        cockpitGroup.add(arch);
+
+        // 3. Side Cannons (Visual reference for shooting)
+        const gunGeo = new THREE.BoxGeometry(0.5, 0.5, 3);
+        const leftGun = new THREE.LineSegments(new THREE.EdgesGeometry(gunGeo), hardMat);
+        leftGun.position.set(-2.5, -1, -1);
+        cockpitGroup.add(leftGun);
+
+        const rightGun = new THREE.LineSegments(new THREE.EdgesGeometry(gunGeo), hardMat);
+        rightGun.position.set(2.5, -1, -1);
+        cockpitGroup.add(rightGun);
+
+        // 4. Hitbox Approximation (For getting shot)
+        // Silver tier scale is 1.4. Let's make player bbox about 4 units wide, 2 units high
+        const bboxGeo = new THREE.BoxGeometry(5, 2, 8);
+        const bboxMesh = new THREE.Mesh(bboxGeo, new THREE.MeshBasicMaterial({visible: false}));
+        player.add(bboxMesh);
+    }
+
+    // --- GAME CONTROL ---
+    function startGame() {
+        AudioEngine.startMusic();
+        document.getElementById('load-screen').style.opacity = 0;
+        setTimeout(() => { document.getElementById('load-screen').style.display = 'none'; }, 500);
+        isPlaying = true;
+        scheduleNextSpawn();
+    }
+
+    function resetGame() {
+        if(spawnTimeout) clearTimeout(spawnTimeout);
+        document.getElementById('crash-screen').style.display = 'none';
+        document.getElementById('name-input-section').style.display = 'none';
+        
+        player.position.set(0, 100, 0);
+        player.rotation.set(0, 0, 0);
+        cockpitGroup.rotation.set(0,0,0);
+        
+        currentPitchRate = 0; currentYawRate = 0; currentRollRate = 0;
+        currentSpeed = 0; score = 0; hudScore.innerText = "000000";
+        
+        Object.values(terrainChunks).forEach(c => { scene.remove(c.mesh); c.buildings.forEach(b => scene.remove(b)); });
+        lasers.forEach(l => scene.remove(l));
+        traffic.forEach(t => scene.remove(t));
+        
+        lasers = []; terrainChunks = {}; activeBuildings = []; traffic = [];
+        
+        isCrashed = false; isPlaying = true;
+        updateChunks(); AudioEngine.startMusic();
+        scheduleNextSpawn();
+    }
+
+    function gameOver() {
+        isCrashed = true; isPlaying = false; 
+        AudioEngine.sfxCrash();
+        if(spawnTimeout) clearTimeout(spawnTimeout);
+        spawnExplosion(player.position, CONFIG.colors.player, 80);
+        // Don't hide player group, just stop updating to simulate frozen/destroyed state visually
+        
+        const scores = getScores();
+        const isHighScore = scores.length < 3 || score > scores[scores.length-1].score;
+        setTimeout(() => {
+            document.getElementById('crash-screen').style.display = 'flex';
+            if(isHighScore) {
+                document.getElementById('name-input-section').style.display = 'flex';
+                document.getElementById('player-name').value = "";
+                document.getElementById('player-name').focus();
+            }
+            updateLeaderboardDisplay();
+        }, 1500);
+    }
+
+    // --- LEADERBOARD ---
+    function getScores() { const s = localStorage.getItem('neon_scores_cockpit'); return s ? JSON.parse(s) : []; }
+    function saveScore() {
+        const name = document.getElementById('player-name').value.toUpperCase() || "UNK";
+        const scores = getScores();
+        scores.push({ name: name, score: score });
+        scores.sort((a,b) => b.score - a.score);
+        if(scores.length > 3) scores.length = 3;
+        localStorage.setItem('neon_scores_cockpit', JSON.stringify(scores));
+        document.getElementById('name-input-section').style.display = 'none';
+        updateLeaderboardDisplay();
+    }
+    function updateLeaderboardDisplay() {
+        const list = document.getElementById('lb-list');
+        const scores = getScores();
+        list.innerHTML = scores.length ? '' : '<div style="text-align:center; color:#666">NO DATA</div>';
+        scores.forEach((s, i) => list.innerHTML += `<div class="lb-row"><span class="lb-rank">${i+1}.</span><span>${s.name}</span><span>${s.score}</span></div>`);
+    }
+
+    // --- SPAWNING ---
+    function getWeightedTier() {
+        const rand = Math.random() * 13;
+        if (rand < 9) return CAR_TIERS.BRONZE;
+        if (rand < 12) return CAR_TIERS.SILVER;
+        return CAR_TIERS.GOLD;
+    }
+    function scheduleNextSpawn() {
+        if (!isPlaying) return;
+        const delay = CONFIG.spawnMinTime + Math.random() * (CONFIG.spawnMaxTime - CONFIG.spawnMinTime);
+        spawnTimeout = setTimeout(() => { spawnTrafficCar(); scheduleNextSpawn(); }, delay);
+    }
+    function spawnTrafficCar() {
+        const tier = getWeightedTier();
+        const spawnDist = CONFIG.chunkSize * CONFIG.renderDistance * 0.9;
+        const axis = Math.random() > 0.5 ? 'x' : 'z';
+        const offset = (Math.random() - 0.5) * CONFIG.chunkSize * 2; 
+        let posX, posZ, dirX, dirZ;
+        if (axis === 'x') {
+            posX = player.position.x + spawnDist * (Math.random() > 0.5 ? 1 : -1);
+            posZ = player.position.z + offset;
+            dirX = (player.position.x - posX); dirZ = 0;
+        } else {
+            posX = player.position.x + offset;
+            posZ = player.position.z + spawnDist * (Math.random() > 0.5 ? 1 : -1);
+            dirX = 0; dirZ = (player.position.z - posZ);
+        }
+        createTrafficCar(posX, posZ, dirX, dirZ, tier);
+    }
+    function createTrafficCar(x, z, dirX, dirZ, tier) {
+        const carGroup = new THREE.Group();
+        const bodyGeo = new THREE.BoxGeometry(4, 2, 8);
+        const bodyMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        const edges = new THREE.EdgesGeometry(bodyGeo);
+        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: tier.color }));
+        body.add(line); carGroup.add(body);
+        const engineGeo = new THREE.BoxGeometry(1, 1, 6);
+        const engineMat = new THREE.MeshBasicMaterial({ color: tier.engineColor });
+        const leftE = new THREE.Mesh(engineGeo, engineMat); leftE.position.set(-2.5, 0, -1);
+        const rightE = new THREE.Mesh(engineGeo, engineMat); rightE.position.set(2.5, 0, -1);
+        carGroup.add(leftE); carGroup.add(rightE);
+        
+        const alt = tier.altMin + Math.random() * (tier.altMax - tier.altMin);
+        carGroup.position.set(x, alt, z);
+        carGroup.scale.setScalar(tier.scale);
+        const speed = (0.8 + Math.random() * 0.5) * tier.speedMult;
+        carGroup.userData = { velocity: new THREE.Vector3(dirX, 0, dirZ).normalize().multiplyScalar(speed), baseSpeed: speed, tier: tier };
+        carGroup.lookAt(carGroup.position.clone().add(carGroup.userData.velocity));
+        scene.add(carGroup); traffic.push(carGroup);
+    }
+
+    function manageTraffic() {
+        for (let i = traffic.length - 1; i >= 0; i--) {
+            const car = traffic[i];
+            if (car.position.distanceTo(player.position) > CONFIG.despawnDist) {
+                scene.remove(car); traffic.splice(i, 1); continue;
+            }
+            const v = car.userData.velocity;
+            const sensorPos = car.position.clone().add(v.clone().multiplyScalar(40)); 
+            let risk = false;
+            for (let b of activeBuildings) {
+                if (car.position.distanceTo(b.position) < 300) {
+                    if (b.collider.containsPoint(sensorPos)) { risk = true; break; }
+                }
+            }
+            if (risk) { v.y += 0.15; v.applyAxisAngle(new THREE.Vector3(0,1,0), 0.05); } 
+            else {
+                const targetY = (car.userData.tier.altMin + car.userData.tier.altMax) / 2;
+                if (car.position.y > targetY + 10) v.y -= 0.02;
+                else if (car.position.y < targetY - 10) v.y += 0.02;
+                else v.y *= 0.9;
+            }
+            v.normalize().multiplyScalar(car.userData.baseSpeed);
+            car.position.add(v); car.lookAt(car.position.clone().add(v));
+        }
+    }
+
+    // --- COMBAT & CONVERGING LASERS ---
+    function fireLaser() {
+        const now = Date.now();
+        if (now - lastShotTime < 130) return;
+        lastShotTime = now;
+        AudioEngine.sfxLaser();
+
+        const geometry = new THREE.BoxGeometry(0.2, 0.2, 4);
+        const material = new THREE.MeshBasicMaterial({ color: CONFIG.colors.laser });
+        
+        // Target point: 200 units straight ahead of the cockpit
+        const targetDist = CONFIG.laserRange;
+        const targetPos = new THREE.Vector3(0, 0, -targetDist).applyMatrix4(player.matrixWorld);
+
+        [-2.5, 2.5].forEach(off => {
+            const laser = new THREE.Mesh(geometry, material);
+            
+            // Spawn at gun position
+            const spawnOffset = new THREE.Vector3(off, -1, -2); // Relative to cockpit
+            const spawnPos = spawnOffset.applyMatrix4(player.matrixWorld);
+            laser.position.copy(spawnPos);
+            
+            // Calculate Vector to Target
+            const dir = new THREE.Vector3().subVectors(targetPos, spawnPos).normalize();
+            
+            // Align laser to direction
+            laser.lookAt(targetPos);
+
+            // Add velocity
+            laser.userData.velocity = dir.multiplyScalar(CONFIG.laserSpeed);
+            
+            // Add ship speed (approximate forward vector)
+            const shipForward = new THREE.Vector3(0, 0, -1).applyQuaternion(player.quaternion).multiplyScalar(currentSpeed);
+            laser.userData.velocity.add(shipForward);
+            
+            laser.userData.distance = 0;
+            scene.add(laser); lasers.push(laser);
+        });
+    }
+
+    function updateLasers() {
+        for (let i = lasers.length - 1; i >= 0; i--) {
+            const l = lasers[i];
+            l.position.add(l.userData.velocity);
+            l.userData.distance += 1;
+            if (l.userData.distance > 80) { scene.remove(l); lasers.splice(i, 1); continue; } // Range limit (frames)
+
+            const laserBox = new THREE.Box3().setFromObject(l);
+            for (let j = traffic.length - 1; j >= 0; j--) {
+                const car = traffic[j];
+                const hitboxScale = car.userData.tier.scale * 3.5; 
+                const carBox = new THREE.Box3().setFromObject(car).expandByScalar(hitboxScale);
+
+                if (laserBox.intersectsBox(carBox)) {
+                    AudioEngine.sfxExplosion();
+                    spawnExplosion(car.position, car.userData.tier.color, 25);
+                    scene.remove(car); traffic.splice(j, 1);
+                    scene.remove(l); lasers.splice(i, 1);
+                    score += car.userData.tier.score;
+                    hudScore.innerText = score.toString().padStart(6, '0');
+                    crosshair.classList.add('locked');
+                    setTimeout(() => crosshair.classList.remove('locked'), 100);
+                    break;
+                }
+            }
+        }
+    }
+
+    // --- ENVIRONMENT ---
+    function createBuilding(x, z) {
+        const width = 15 + Math.random() * 20;
+        const depth = 15 + Math.random() * 20;
+        const height = 30 + Math.random() * 200;
+        const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(width, height, depth));
+        const material = new THREE.LineBasicMaterial({ color: Math.random()>0.8?CONFIG.colors.grid:CONFIG.colors.building, opacity: 0.5, transparent: true });
+        const building = new THREE.LineSegments(edges, material);
+        building.position.set(x, height / 2, z);
+        building.geometry.computeBoundingBox();
+        const bbox = new THREE.Box3().setFromObject(building); bbox.expandByScalar(-1);
+        building.collider = bbox;
+        scene.add(building); activeBuildings.push(building);
+        return building;
+    }
+
+    function updateChunks() {
+        const cx = Math.floor(player.position.x / CONFIG.chunkSize);
+        const cz = Math.floor(player.position.z / CONFIG.chunkSize);
+        const activeKeys = new Set();
+        for (let x = -CONFIG.renderDistance; x <= CONFIG.renderDistance; x++) {
+            for (let z = -CONFIG.renderDistance; z <= CONFIG.renderDistance; z++) {
+                const key = `${cx + x},${cz + z}`; activeKeys.add(key);
+                if (!terrainChunks[key]) {
+                    const gh = new THREE.GridHelper(CONFIG.chunkSize, 10, CONFIG.colors.grid, CONFIG.colors.grid);
+                    gh.position.set((cx+x)*CONFIG.chunkSize + CONFIG.chunkSize/2, 0, (cz+z)*CONFIG.chunkSize + CONFIG.chunkSize/2);
+                    scene.add(gh);
+                    const bldgs = [];
+                    const chunkWorldX = (cx+x)*CONFIG.chunkSize;
+                    const chunkWorldZ = (cz+z)*CONFIG.chunkSize;
+                    for(let i=0; i<CONFIG.buildingCount; i++) {
+                        const bx = chunkWorldX + Math.random() * CONFIG.chunkSize;
+                        const bz = chunkWorldZ + Math.random() * CONFIG.chunkSize;
+                        if (bx > -200 && bx < 200 && bz < 200 && bz > -2000) continue;
+                        bldgs.push(createBuilding(bx, bz));
+                    }
+                    terrainChunks[key] = { mesh: gh, buildings: bldgs };
+                }
+            }
+        }
+        for (const key in terrainChunks) {
+            if (!activeKeys.has(key)) {
+                scene.remove(terrainChunks[key].mesh);
+                terrainChunks[key].buildings.forEach(b => { scene.remove(b); const idx = activeBuildings.indexOf(b); if(idx>-1) activeBuildings.splice(idx,1); });
+                delete terrainChunks[key];
+            }
+        }
+    }
+
+    function spawnExplosion(pos, color, count) {
+        for (let i = 0; i < count; i++) {
+            const p = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), new THREE.MeshBasicMaterial({ color: color }));
+            p.position.copy(pos);
+            p.userData.vel = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(Math.random()*6);
+            scene.add(p); particles.push(p);
+        }
+    }
+
+    function updateParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i]; p.position.add(p.userData.vel); p.scale.multiplyScalar(0.92);
+            if (p.scale.x < 0.1) { scene.remove(p); particles.splice(i, 1); }
+        }
+    }
+
+    // --- MAIN LOOP ---
+    function onKey(e, pressed) {
+        const key = e.key.toLowerCase();
+        if (keys.hasOwnProperty(key)) keys[key] = pressed;
+        if (keys.hasOwnProperty(e.key)) keys[e.key] = pressed;
+    }
+    function lerp(start, end, amt) { return (1 - amt) * start + amt * end; }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if (isCrashed) { updateParticles(); renderer.render(scene, camera); return; }
+        if (isPlaying) {
+            let targetSpeed = CONFIG.baseSpeed;
+            if (keys.Shift) targetSpeed = CONFIG.maxSpeed;
+            if (keys.Control) targetSpeed = CONFIG.brakeSpeed;
+            currentSpeed += (targetSpeed - currentSpeed) * 0.1;
+
+            // --- INPUTS ---
+            let targetPitch = 0, targetYaw = 0, targetRoll = 0;
+
+            if (keys.w) targetPitch = CONFIG.maxPitchRate;
+            if (keys.s) targetPitch = -CONFIG.maxPitchRate;
+            if (keys.a) targetYaw = CONFIG.maxYawRate;
+            if (keys.d) targetYaw = -CONFIG.maxYawRate;
+            if (keys.q) targetRoll = CONFIG.maxRollRate;
+            if (keys.e) targetRoll = -CONFIG.maxRollRate;
+
+            currentPitchRate = lerp(currentPitchRate, targetPitch, CONFIG.rotationAccel);
+            currentYawRate = lerp(currentYawRate, targetYaw, CONFIG.rotationAccel);
+            currentRollRate = lerp(currentRollRate, targetRoll, CONFIG.rotationAccel);
+
+            player.rotateX(currentPitchRate);
+            player.rotateY(currentYawRate);
+            player.rotateZ(currentRollRate);
+
+            if (keys[' ']) fireLaser();
+
+            player.translateZ(-currentSpeed);
+
+            // --- COCKPIT DYNAMICS ---
+            // 1. Lag the cockpit rotation slightly to simulate head movement
+            cockpitGroup.rotation.z = lerp(cockpitGroup.rotation.z, -currentYawRate * 5, 0.1); 
+            cockpitGroup.rotation.x = lerp(cockpitGroup.rotation.x, currentPitchRate * 2, 0.1);
+            
+            // 2. Shake on boost
+            if (keys.Shift) {
+                cockpitGroup.position.x = (Math.random() - 0.5) * 0.05;
+                cockpitGroup.position.y = (Math.random() - 0.5) * 0.05;
+                camera.fov = lerp(camera.fov, 95, 0.05); // Warp Speed FOV
+            } else {
+                cockpitGroup.position.set(0,0,0);
+                camera.fov = lerp(camera.fov, 75, 0.1);
+            }
+            camera.updateProjectionMatrix();
+
+            updateChunks(); manageTraffic(); updateLasers(); updateParticles();
+
+            // Collision - Adjust playerBox to new size
+            const playerBox = new THREE.Box3().setFromObject(player).expandByScalar(-1);
+            if (player.position.y < 1 || player.position.y > 600) gameOver();
+            for (let b of activeBuildings) {
+                if (player.position.distanceTo(b.position) < 100) {
+                    if (b.collider && playerBox.intersectsBox(b.collider)) { gameOver(); break; }
+                }
+            }
+            hudSpeed.innerText = Math.round(currentSpeed * 100);
+            hudAlt.innerText = Math.round(player.position.y);
+        }
+        renderer.render(scene, camera);
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    init();
+</script>
+</body>
+</html>
