@@ -79,14 +79,14 @@
             display: flex;
             justify-content: center;
             width: 100%;
-            margin: 5px 0;
+            margin: 25px 0; /* Spaced out vertically */
         }
 
         /* --- The Hole (Mask) --- */
         .hole {
             position: relative;
             width: 150px;
-            height: 220px;
+            height: 240px; 
             margin: 0 10px;
             overflow: hidden; 
             border-radius: 0 0 50px 50px;
@@ -97,20 +97,20 @@
             position: absolute;
             left: 50%;
             width: 130px;
-            height: 350px; /* Taller to fit hats */
-            top: 220px; /* Start hidden */
+            height: 350px; 
+            top: 240px; /* Hidden */
             transform: translateX(-50%);
             transition: top 0.4s cubic-bezier(0.4, 2.3, 0.5, 1);
             z-index: 1;
         }
 
         .hole.up .giraffe-container {
-            top: 40px; /* Adjusted to fit hats */
+            top: 10px; /* High visibility */
             cursor: pointer;
         }
 
         .hole.bonked .giraffe-container {
-            top: 60px;
+            top: 50px; /* Sinks slightly on hit */
             transition: top 0.1s ease-out;
             pointer-events: none;
         }
@@ -129,11 +129,8 @@
 
         /* --- ANIMATIONS & TYPES --- */
         .eyes-cross, .tongue-group, .spit-particle { display: none; }
-        
-        /* Accessory Visibility Logic */
         .acc-party, .acc-crown { display: none; }
         
-        /* Show accessories based on container class */
         .giraffe-container.type-party .acc-party { display: block; }
         .giraffe-container.type-crown .acc-crown { display: block; }
 
@@ -248,9 +245,10 @@
         @media (max-width: 900px) {
             .hole { width: 100px; height: 160px; margin: 0 4px; border-radius: 0 0 30px 30px; }
             .giraffe-container { width: 90px; height: 250px; top: 160px; }
-            .hole.up .giraffe-container { top: 20px; }
-            .hole.bonked .giraffe-container { top: 40px; }
+            .hole.up .giraffe-container { top: 10px; }
+            .hole.bonked .giraffe-container { top: 30px; }
             .bush-container { height: 100px; bottom: -15px; }
+            .row { margin: 15px 0; }
         }
     </style>
 </head>
@@ -310,26 +308,24 @@
         const CONFIG = {
             GAME_DURATION: 60, 
 
-            // SPEED SETTINGS (Reduced by 25% from original)
-            START_MIN_TIME: 750, 
-            START_MAX_TIME: 1350, 
+            // SPEED SETTINGS (Slowed down by ~20%)
+            START_MIN_TIME: 900, 
+            START_MAX_TIME: 1600, 
 
-            // Speed Limit (Max Difficulty)
-            END_MIN_TIME_LIMIT: 250, 
-            END_MAX_TIME_LIMIT: 500, 
+            // Speed Limit
+            END_MIN_TIME_LIMIT: 300, 
+            END_MAX_TIME_LIMIT: 600, 
 
-            // Speed Ramp decrement per whack
+            // Speed Ramp decrement
             SPEED_DECREMENT: 15,
 
             // --- PROBABILITIES (1 in X) ---
-            // Crown: 1 in 11 (approx 0.09)
-            // Party: 1 in 5  (0.20)
             PROB_CROWN: 1 / 11,
             PROB_PARTY: 1 / 5,
             
             // --- DURATION MODIFIERS ---
-            MOD_PARTY_TIME: 0.75, // 3/4 time
-            MOD_CROWN_TIME: 0.5   // 1/2 time (Fast!)
+            MOD_PARTY_TIME: 0.75, 
+            MOD_CROWN_TIME: 0.5   
         };
 
         // --- ASSETS (SVGs) ---
@@ -345,9 +341,7 @@
                 <!-- Head Group -->
                 <g transform="translate(0, 50)">
                     
-                    <!-- ACCESSORIES (Hidden by default) -->
-                    
-                    <!-- Party Hat (Behind Ears) -->
+                    <!-- ACCESSORIES -->
                     <g class="acc-party" transform="translate(0, -50) rotate(-10)">
                         <path d="M-15,10 L0,-40 L15,10 Z" fill="#74b9ff" stroke="#0984e3" stroke-width="2"/>
                         <circle cx="0" cy="-40" r="4" fill="#ff7675"/>
@@ -355,7 +349,6 @@
                         <circle cx="4" cy="0" r="2" fill="white" opacity="0.5"/>
                     </g>
 
-                    <!-- Crown -->
                     <g class="acc-crown" transform="translate(0, -45)">
                         <path d="M-20,10 L-20,-15 L-10,0 L0,-25 L10,0 L20,-15 L20,10 Z" fill="#ffd700" stroke="#b7950b" stroke-width="2"/>
                         <circle cx="0" cy="-25" r="3" fill="#d63031"/>
@@ -367,7 +360,7 @@
                     <ellipse cx="-28" cy="-10" rx="14" ry="8" fill="#F4D03F" transform="rotate(-20)"/>
                     <ellipse cx="28" cy="-10" rx="14" ry="8" fill="#F4D03F" transform="rotate(20)"/>
 
-                    <!-- Horns (Ossicones) -->
+                    <!-- Horns -->
                     <path d="M-10,-28 L-14,-50" stroke="#F4D03F" stroke-width="7" stroke-linecap="round"/>
                     <circle cx="-14" cy="-50" r="6" fill="#B7950B"/>
                     <path d="M10,-28 L14,-50" stroke="#F4D03F" stroke-width="7" stroke-linecap="round"/>
@@ -526,35 +519,19 @@
             const giraffe = hole.querySelector('.giraffe-container');
             
             // --- DETERMINE GIRAFFE TYPE ---
-            // Random value between 0 and 1
             const rand = Math.random();
             let type = 'normal';
 
-            // Reset classes
             giraffe.classList.remove('type-party', 'type-crown');
 
-            // Logic: 
-            // 1. Check for Crown (1 in 11)
-            // 2. Else check for Party (1 in 5)
-            // 3. Else Normal
-            
             if (rand < CONFIG.PROB_CROWN) {
-                // ~9% Chance
                 type = 'crown';
                 giraffe.classList.add('type-crown');
                 time = time * CONFIG.MOD_CROWN_TIME;
-            } 
-            // Note: The probability space is additive here because we check sequentially on a single random number.
-            // PROB_CROWN (0.09) + PROB_PARTY (0.20) = 0.29
-            else if (rand < (CONFIG.PROB_CROWN + CONFIG.PROB_PARTY)) {
-                // ~20% Chance
+            } else if (rand < (CONFIG.PROB_CROWN + CONFIG.PROB_PARTY)) {
                 type = 'party';
                 giraffe.classList.add('type-party');
                 time = time * CONFIG.MOD_PARTY_TIME;
-            } 
-            else {
-                // Remaining (~71%)
-                // Normal type
             }
 
             hole.classList.add('up');
@@ -633,8 +610,7 @@
             const hole = this.parentNode;
             if(hole.classList.contains('bonked')) return;
 
-            // --- POINT LOGIC ---
-            const giraffe = this; // 'this' is the giraffe-container
+            const giraffe = this;
             let points = 1;
             let labelClass = "";
 
@@ -653,7 +629,6 @@
             hole.classList.add('bonked');
             playSound('raspberry');
 
-            // Float Score
             const float = document.createElement('div');
             float.classList.add('float-score');
             if(labelClass) float.classList.add(labelClass);
@@ -666,13 +641,13 @@
             document.body.appendChild(float);
             setTimeout(() => float.remove(), 800);
 
-            // Speed Ramp
             if (minTime > CONFIG.END_MIN_TIME_LIMIT) minTime -= CONFIG.SPEED_DECREMENT;
             if (maxTime > CONFIG.END_MAX_TIME_LIMIT) maxTime -= CONFIG.SPEED_DECREMENT;
 
+            // REDUCED TIMEOUT for snappy raspberry hiding
             setTimeout(() => {
                 hole.classList.remove('bonked');
-            }, 600);
+            }, 400);
         }
 
         giraffeElements.forEach(g => {
