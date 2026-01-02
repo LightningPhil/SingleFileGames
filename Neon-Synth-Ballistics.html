@@ -1,0 +1,1692 @@
+<!-- START OF FILE ai_studio_code (30).html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon-Synth Ballistics</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Share Tech Mono', monospace;
+            user-select: none;
+            color: #fff;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background-image: 
+                linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 40px 40px;
+            box-shadow: inset 0 0 100px #000;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #terrain-layer { z-index: 1; filter: drop-shadow(0 0 2px #0ff); }
+        #game-layer { z-index: 2; pointer-events: none; }
+        
+        #scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 20;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .faction-a { color: #00f3ff; text-shadow: 0 0 10px #00f3ff; }
+        .faction-b { color: #ff0055; text-shadow: 0 0 10px #ff0055; }
+
+        #turn-indicator {
+            position: absolute;
+            top: 15%;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 50px;
+            text-shadow: 0 0 20px currentColor;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #dashboard {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            pointer-events: auto;
+        }
+
+        #weapon-panel { display: flex; gap: 10px; }
+        .weapon-card {
+            width: 55px; height: 80px;
+            border: 1px solid #444;
+            background: rgba(0,0,0,0.8);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-size: 10px; color: #888;
+            transition: 0.2s; position: relative;
+        }
+        .weapon-card.active {
+            border-color: #fff;
+            box-shadow: 0 0 10px #fff;
+            color: #fff; transform: translateY(-5px);
+        }
+        
+        /* Locked State for Nuke / Cooldown */
+        .weapon-card.locked {
+            border-color: #300;
+            color: #500;
+            opacity: 0.6;
+        }
+        .weapon-card.locked::after {
+            content: "🚫";
+            position: absolute;
+            font-size: 30px;
+            color: rgba(255, 0, 0, 0.8);
+            text-shadow: 0 0 10px #f00;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        /* Specific visual for Cooldown vs Lock */
+        .weapon-card.cooldown::after {
+            content: "⏳";
+            filter: grayscale(100%);
+        }
+        
+        .key-hint {
+            position: absolute; top: 2px; right: 5px;
+            font-size: 10px; color: #555; font-weight: bold;
+        }
+        .weapon-card.active .key-hint { color: #fff; }
+        .weapon-icon { font-size: 20px; margin: 2px 0; }
+        .weapon-ammo { font-size: 14px; font-weight: bold; margin-top: 2px; color: #aaa; }
+        .weapon-card.active .weapon-ammo { color: #fff; }
+
+        #gauges-panel {
+            display: flex; flex-direction: column;
+            align-items: center; width: 300px; gap: 10px;
+        }
+
+        .bar-container {
+            width: 100%; height: 12px;
+            background: #111; border: 1px solid #444; position: relative;
+        }
+        .bar-label {
+            position: absolute; left: -50px; top: -2px;
+            font-size: 12px; color: #aaa; width: 45px; text-align: right;
+        }
+        #power-fill { height: 100%; width: 0%; background: #fff; box-shadow: 0 0 10px #fff; }
+        #fuel-fill { height: 100%; width: 100%; background: #ffaa00; box-shadow: 0 0 5px #ffaa00; transition: width 0.1s linear; }
+
+        #controls-hint {
+            position: absolute; bottom: 5px; width: 100%;
+            text-align: center; font-size: 11px; color: #555; left: 0;
+        }
+
+        .overlay-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 30;
+            display: none; flex-direction: column;
+            align-items: center; justify-content: center; color: white;
+            backdrop-filter: blur(5px);
+        }
+
+        button {
+            margin-top: 20px; padding: 10px 40px;
+            background: transparent; border: 2px solid #00f3ff;
+            color: #00f3ff; font-family: 'Share Tech Mono', monospace;
+            font-size: 24px; cursor: pointer; pointer-events: auto;
+            box-shadow: 0 0 15px #00f3ff; transition: 0.2s;
+        }
+        button:hover { background: #00f3ff; color: #000; }
+
+        #settings-menu { z-index: 40; background: rgba(0,0,0,0.95); padding: 40px; box-sizing: border-box; }
+        .setting-row { margin: 15px; width: 400px; display: flex; justify-content: space-between; align-items: center;}
+        input[type=range] { width: 150px; accent-color: #00f3ff; }
+        
+        #start-overlay { z-index: 50; display: flex; background: rgba(0,0,0,0.8); }
+        
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 14px;
+            color: #aaa;
+            text-align: left;
+            width: 400px;
+            margin-top: 20px;
+            border-top: 1px solid #333;
+            padding-top: 20px;
+        }
+        .controls-grid div span { color: #fff; font-weight: bold; }
+        .nuke-rule {
+            grid-column: 1 / -1;
+            margin-top: 15px;
+            padding: 10px;
+            border: 1px solid #ff0055;
+            color: #ff0055;
+            background: rgba(255, 0, 85, 0.1);
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="terrain-layer"></canvas>
+    <canvas id="game-layer"></canvas>
+    <div id="scanline"></div>
+
+    <div id="ui-layer">
+        <div class="hud-top">
+            <div id="p1-score" class="faction-a">VANGUARD: 3 UNITS</div>
+            <div id="wind-display" style="color:#fff; opacity: 0.7; font-size: 20px;">WIND: 0</div>
+            <div id="p2-score" class="faction-b">SYNDICATE: 3 UNITS</div>
+        </div>
+        
+        <div id="turn-indicator">PLAYER 1</div>
+
+        <div id="dashboard">
+            <div id="weapon-panel"></div>
+            <div id="gauges-panel">
+                <div class="bar-container">
+                    <div class="bar-label">FUEL</div>
+                    <div id="fuel-fill"></div>
+                </div>
+                <div class="bar-container" style="margin-top: 5px;">
+                    <div class="bar-label">PWR</div>
+                    <div id="power-fill"></div>
+                </div>
+            </div>
+            <div style="width: 250px;"></div>
+        </div>
+
+        <div id="controls-hint">
+            ARROWS: MOVE & AIM | SHIFT: JETPACK | CTRL: SWITCH UNIT | SPACE: FIRE | 1-7: WEAPON | ESC: SETTINGS
+        </div>
+    </div>
+
+    <div id="start-overlay" class="overlay-screen" onclick="AudioEngine.init(); this.style.display='none';">
+        <h1 style="color:#00f3ff; text-shadow:0 0 10px #00f3ff; font-size: 40px; text-align:center;">NEON-SYNTH BALLISTICS</h1>
+        <p>CLICK TO ENGAGE SYSTEMS</p>
+    </div>
+
+    <div id="game-over" class="overlay-screen">
+        <h1 id="winner-text" style="font-size: 60px; text-shadow: 0 0 20px white;">GAME OVER</h1>
+        <button onclick="location.reload()">REBOOT SYSTEM</button>
+    </div>
+
+    <div id="settings-menu" class="overlay-screen">
+        <h1 style="color:#00f3ff; text-shadow:0 0 10px #00f3ff">SYSTEM SETTINGS</h1>
+        
+        <div class="setting-row">
+            <span>MUSIC VOL</span>
+            <input type="range" id="vol-music" min="0" max="100" value="30">
+        </div>
+        <div class="setting-row">
+            <span>SFX VOL</span>
+            <input type="range" id="vol-sfx" min="0" max="100" value="50">
+        </div>
+        <div class="setting-row">
+            <span>SOUNDTRACK</span>
+            <button id="track-btn" onclick="toggleTrack()" style="margin:0; padding: 5px; font-size: 16px; width: 150px;">NEON VIBE</button>
+        </div>
+
+        <div class="controls-grid">
+            <div><span>ARROWS</span> : MOVE / AIM</div>
+            <div><span>SPACE</span> : CHARGE & FIRE</div>
+            <div><span>SHIFT</span> : JETPACK (Fuel)</div>
+            <div><span>CTRL</span> : SWITCH UNIT</div>
+            <div><span>1 - 7</span> : SELECT WEAPON</div>
+            <div><span>ESC</span> : PAUSE / MENU</div>
+            
+            <div class="nuke-rule">
+                <strong>⚠️ NUKE PROTOCOL ⚠️</strong><br>
+                <span style="font-size:12px; color: #ff8cae;">ACCESS DENIED IF HEALTH > 50%</span>
+            </div>
+        </div>
+
+        <button onclick="toggleSettings()">RESUME</button>
+    </div>
+</div>
+
+<script>
+/**
+ * =========================================
+ * PRO 8-BIT AUDIO ENGINE
+ * =========================================
+ */
+const AudioEngine = {
+    ctx: null,
+    masterGain: null,
+    musicGain: null,
+    sfxGain: null,
+    settings: { music: 0.3, sfx: 0.5 },
+    currentTrackIndex: 0,
+    
+    // Sequencer
+    isPlaying: false,
+    timerId: null,
+    currentSixteenth: 0,
+    tempo: 135,
+    
+    // Frequencies
+    N: {
+        C2: 65.41, D2: 73.42, Eb2: 77.78, E2: 82.41, F2: 87.31, G2: 98.00, Ab2: 103.83, A2: 110.00, Bb2: 116.54, B2: 123.47,
+        C3: 130.81, D3: 146.83, Eb3: 155.56, E3: 164.81, F3: 174.61, G3: 196.00, Ab3: 207.65, A3: 220.00, Bb3: 233.08,
+        C4: 261.63, D4: 293.66, Eb4: 311.13, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, Bb4: 466.16, B4: 493.88,
+        C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00
+    },
+    
+    songLibrary: [
+        {
+            name: "NEON VIBE",
+            tempo: 135,
+            bassA:  ['C2',0,'C2',0, 'C2','C2',0,'C2', 'Eb2',0,'Eb2',0, 'F2',0,'G2',0, 'C2',0,'C2',0, 'C2','C2',0,'C2', 'Ab2',0,'G2',0, 'F2',0,'Eb2',0],
+            leadA: ['C4',0,'G4',0, 'C5',0,'G4',0, 'Eb4',0,'F4',0, 'G4',0,0,0, 'C4',0,'G4',0, 'C5',0,'Eb4',0, 'C5',0,'Bb4',0, 'G4',0,'F4',0],
+            drumA: [1,0,3,0, 2,0,3,0, 1,0,3,0, 2,0,3,1, 1,0,3,0, 2,0,3,0, 1,1,3,0, 2,2,2,2],
+
+            bassB: ['Ab2',0,'Ab2',0, 'Ab2',0,'Ab2',0, 'Bb2',0,'Bb2',0, 'C3',0,'C3',0, 'C3',0,'C3',0, 'Bb2',0,'Bb2',0, 'Ab2',0,'Ab2',0, 'G2',0,'G2',0],
+            leadB: ['C5',0,'C5',0, 0,0,'C5',0, 'D5',0,'D5',0, 0,0,'D5',0, 'Eb5',0,'Eb5',0, 'F5',0,'Eb5',0, 'D5',0,'C5',0, 'Bb4',0,'G4',0],
+            drumB: [1,0,3,0, 2,0,3,0, 1,0,3,0, 2,0,3,0, 1,0,1,0, 2,0,2,0, 1,0,3,3, 2,2,3,3],
+
+            bassC: ['F2',0,'F2',0, 'G2',0,'G2',0, 'Ab2',0,'Ab2',0, 'G2',0,'G2',0, 'F2',0,'F2',0, 'Eb2',0,'Eb2',0, 'D2',0,'D2',0, 'G2','G2','G2','G2'],
+            leadC: ['F4',0,'A4',0, 'C5',0,0,0, 'F5',0,'Eb5',0, 'D5',0,'C5',0, 'B4',0,'G4',0, 'F4',0,'D4',0, 'B3',0,'G3',0, 'G4','A4','B4','D5'],
+            drumC: [1,3,2,3, 1,3,2,3, 1,3,2,3, 1,3,2,3, 1,1,2,2, 3,3,2,2, 1,1,1,1, 2,2,2,2]
+        },
+        {
+            name: "HYPER SPACE",
+            tempo: 160,
+            bassA: ['D2',0,'D2','D2', 'D2',0,'F2','F2', 'G2',0,'G2','G2', 'A2',0,'C3',0, 'D2',0,'D2','D2', 'D2',0,'F2','F2', 'G2',0,'G2','G2', 'F2',0,'E2',0],
+            leadA: ['D4',0,'F4',0, 'A4',0,'D5',0, 'A4',0,'F4',0, 'D4',0,'F4',0, 'G4',0,'Bb4',0, 'D5',0,'G5',0, 'F5',0,'D5',0, 'C5',0,'A4',0],
+            drumA: [1,0,3,0, 2,0,3,0, 1,0,3,0, 2,0,3,0, 1,0,3,0, 2,0,3,0, 1,1,3,0, 2,2,1,2],
+            bassB: ['Bb2',0,'Bb2',0, 'Bb2',0,'Bb2',0, 'C3',0,'C3',0, 'C3',0,'C3',0, 'D3',0,'D3',0, 'D3',0,'D3',0, 'C3',0,'C3',0, 'A2',0,'A2',0],
+            leadB: ['F5',0,0,0, 'F5',0,'E5',0, 'G5',0,0,0, 'G5',0,'F5',0, 'A5',0,0,0, 'A5',0,'G5',0, 'F5',0,'E5',0, 'D5',0,'C5',0],
+            drumB: [1,3,2,3, 1,3,2,3, 1,3,2,3, 1,3,2,3, 1,3,2,3, 1,3,2,3, 1,1,2,2, 1,1,2,2],
+            bassC: ['D2',0,'A2',0, 'D2',0,'A2',0, 'F2',0,'C3',0, 'F2',0,'C3',0, 'G2',0,'D3',0, 'G2',0,'D3',0, 'A2','A2','A2','A2', 'A2','A2','A2','A2'],
+            leadC: ['D5','A4','F4','A4', 'D5','A4','F4','A4', 'F5','C5','A4','C5', 'F5','C5','A4','C5', 'G5','D5','Bb4','D5', 'G5','D5','Bb4','D5', 'A5',0,'A5',0, 'A5',0,'A5',0],
+            drumC: [1,1,1,1, 1,1,1,1, 2,2,2,2, 2,2,2,2, 1,0,1,0, 1,0,1,0, 3,3,3,3, 3,3,3,3]
+        }
+    ],
+
+    songData: null,
+
+    init() {
+        if(this.ctx) { if(this.ctx.state === 'suspended') this.ctx.resume(); return; }
+        const AC = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AC();
+        
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.connect(this.ctx.destination);
+        this.masterGain.gain.setValueAtTime(0, this.ctx.currentTime);
+
+        this.musicGain = this.ctx.createGain();
+        this.sfxGain = this.ctx.createGain();
+        this.musicGain.connect(this.masterGain);
+        this.sfxGain.connect(this.masterGain);
+
+        this.setTrack(0); 
+        this.loadSettings();
+        document.getElementById('start-overlay').style.display = 'none';
+        this.startSequencer();
+    },
+
+    setTrack(index) {
+        this.currentTrackIndex = index;
+        this.songData = this.songLibrary[index];
+        this.tempo = this.songData.tempo;
+        const btn = document.getElementById('track-btn');
+        if(btn) btn.innerText = this.songData.name;
+    },
+
+    loadSettings() {
+        const s = localStorage.getItem('neon_synth_ballistics_settings');
+        if(s) {
+            this.settings = JSON.parse(s);
+            document.getElementById('vol-music').value = this.settings.music * 100;
+            document.getElementById('vol-sfx').value = this.settings.sfx * 100;
+        }
+        this.updateVolumes(true); 
+    },
+
+    saveSettings() { localStorage.setItem('neon_synth_ballistics_settings', JSON.stringify(this.settings)); },
+
+    updateVolumes(isInit = false) {
+        if(!this.ctx) return;
+        const t = this.ctx.currentTime;
+        if(this.musicGain) this.musicGain.gain.setTargetAtTime(this.settings.music, t, 0.1);
+        if(this.sfxGain) this.sfxGain.gain.setTargetAtTime(this.settings.sfx, t, 0.1);
+        if(isInit && this.masterGain) {
+            this.masterGain.gain.setTargetAtTime(1.0, t, 0.5); 
+        }
+    },
+
+    startSequencer() {
+        if(this.isPlaying) return;
+        this.isPlaying = true;
+        let nextNoteTime = this.ctx.currentTime + 0.1;
+
+        const scheduler = () => {
+            if(!this.ctx) return;
+            const secondsPerBeat = 60.0 / this.tempo;
+            const secondsPerSixteenth = secondsPerBeat / 4;
+
+            if (nextNoteTime < this.ctx.currentTime - 0.2) {
+                nextNoteTime = this.ctx.currentTime;
+            }
+
+            while (nextNoteTime < this.ctx.currentTime + 0.1) {
+                this.scheduleNote(this.currentSixteenth, nextNoteTime);
+                nextNoteTime += secondsPerSixteenth;
+                this.currentSixteenth++;
+            }
+            this.timerId = requestAnimationFrame(scheduler);
+        };
+        scheduler();
+    },
+
+    scheduleNote(beatIndex, time) {
+        if (!this.songData) return;
+        const patternLength = 32;
+        const totalLoop = patternLength * 5; 
+        const modBeat = beatIndex % totalLoop;
+        let pName = 'A';
+        let localBeat = modBeat;
+
+        if (modBeat < 32) { pName = 'A'; localBeat = modBeat; }
+        else if (modBeat < 64) { pName = 'A'; localBeat = modBeat - 32; }
+        else if (modBeat < 96) { pName = 'B'; localBeat = modBeat - 64; }
+        else if (modBeat < 128) { pName = 'A'; localBeat = modBeat - 96; }
+        else { pName = 'C'; localBeat = modBeat - 128; }
+
+        const bassNote = this.songData['bass'+pName][localBeat];
+        const leadNote = this.songData['lead'+pName][localBeat];
+        const drumNote = this.songData['drum'+pName][localBeat];
+
+        if (bassNote && this.N[bassNote]) this.playOsc(this.N[bassNote], 'square', time, 0.15, 0.3, this.musicGain);
+        if (leadNote && this.N[leadNote]) this.playOsc(this.N[leadNote], 'sawtooth', time, 0.2, 0.2, this.musicGain);
+
+        if (drumNote === 1) this.playKick(time);
+        else if (drumNote === 2) this.playSnare(time);
+        else if (drumNote === 3) this.playHat(time);
+    },
+
+    playOsc(freq, type, time, dur, vol, dest) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type; osc.frequency.value = freq;
+        osc.connect(gain); gain.connect(dest);
+        gain.gain.setValueAtTime(vol, time);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + dur);
+        osc.start(time); osc.stop(time + dur);
+    },
+
+    playKick(time) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain); gain.connect(this.musicGain);
+        osc.frequency.setValueAtTime(150, time);
+        osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.1);
+        gain.gain.setValueAtTime(0.7, time);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+        osc.start(time); osc.stop(time + 0.1);
+    },
+
+    playSnare(time) { this.playNoise(time, 0.1, 0.25, this.musicGain); },
+    playHat(time) { this.playNoise(time, 0.05, 0.1, this.musicGain, 1000); },
+
+    playNoise(time, dur, vol, dest, highpass = 0) {
+        if (!this.ctx) return;
+        const bSize = this.ctx.sampleRate * dur;
+        const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+        const d = b.getChannelData(0);
+        for(let i=0; i<bSize; i++) d[i] = Math.random() * 2 - 1;
+        
+        const src = this.ctx.createBufferSource();
+        src.buffer = b;
+        const gain = this.ctx.createGain();
+        
+        if(highpass > 0) {
+            const f = this.ctx.createBiquadFilter();
+            f.type = 'highpass'; f.frequency.value = highpass;
+            src.connect(f); f.connect(gain);
+        } else {
+            src.connect(gain);
+        }
+        
+        gain.connect(dest);
+        gain.gain.setValueAtTime(vol, time);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + dur);
+        src.start(time);
+    },
+
+    // --- SFX ---
+
+    sfxHeavyExplosion() {
+        if(!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const sub = this.ctx.createOscillator();
+        const subGain = this.ctx.createGain();
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(100, t);
+        sub.frequency.exponentialRampToValueAtTime(1, t + 0.8);
+        subGain.gain.setValueAtTime(1.0, t);
+        subGain.gain.exponentialRampToValueAtTime(0.01, t + 0.8);
+        sub.connect(subGain); subGain.connect(this.sfxGain);
+        sub.start(t); sub.stop(t + 0.8);
+        this.playNoise(t, 0.6, 0.8, this.sfxGain);
+    },
+
+    sfxBombExplosion() {
+        if(!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(150, t);
+        osc.frequency.exponentialRampToValueAtTime(10, t + 1.0);
+        gain.gain.setValueAtTime(1.0, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 1.0);
+        
+        const bSize = this.ctx.sampleRate * 1.0;
+        const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+        const d = b.getChannelData(0);
+        for(let i=0; i<bSize; i++) d[i] = (Math.random() * 2 - 1);
+        
+        const noiseSrc = this.ctx.createBufferSource();
+        noiseSrc.buffer = b;
+        const noiseFilter = this.ctx.createBiquadFilter();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.setValueAtTime(800, t);
+        noiseFilter.frequency.linearRampToValueAtTime(100, t + 0.8);
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(1.0, t);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 1.0);
+
+        osc.connect(gain); gain.connect(this.sfxGain);
+        noiseSrc.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(this.sfxGain);
+        osc.start(t); osc.stop(t + 1.0);
+        noiseSrc.start(t);
+    },
+
+    sfxNukeExplosion() {
+        if(!this.ctx) return;
+        this.sfxBombExplosion(); 
+        const t = this.ctx.currentTime;
+        const bSize = this.ctx.sampleRate * 2.5; 
+        const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+        const d = b.getChannelData(0);
+        for(let i=0; i<bSize; i++) d[i] = (Math.random() * 2 - 1);
+        
+        const noiseSrc = this.ctx.createBufferSource();
+        noiseSrc.buffer = b;
+        const noiseFilter = this.ctx.createBiquadFilter();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.value = 300; 
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.5, t);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 2.5);
+        noiseSrc.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(this.sfxGain);
+        noiseSrc.start(t);
+    },
+
+    sfxCrunch() {
+        if(!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, t);
+        osc.frequency.linearRampToValueAtTime(50, t + 0.3);
+        gain.gain.setValueAtTime(0.5, t);
+        gain.gain.linearRampToValueAtTime(0, t + 0.3);
+        osc.connect(gain); gain.connect(this.sfxGain);
+        osc.start(t); osc.stop(t+0.3);
+        this.playNoise(t, 0.2, 0.5, this.sfxGain);
+    },
+
+    sfxTankFire() {
+        if(!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(120, t);
+        osc.frequency.exponentialRampToValueAtTime(30, t + 0.15);
+        gain.gain.setValueAtTime(0.8, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+        osc.connect(gain); gain.connect(this.sfxGain);
+        osc.start(t); osc.stop(t + 0.15);
+
+        const bSize = this.ctx.sampleRate * 0.2;
+        const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+        const d = b.getChannelData(0);
+        for(let i=0; i<bSize; i++) d[i] = Math.random() * 2 - 1;
+        const src = this.ctx.createBufferSource();
+        src.buffer = b;
+        const f = this.ctx.createBiquadFilter();
+        f.type = 'lowpass'; f.frequency.value = 800;
+        const nGain = this.ctx.createGain();
+        nGain.gain.setValueAtTime(0.5, t);
+        nGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+        src.connect(f); f.connect(nGain); nGain.connect(this.sfxGain);
+        src.start(t);
+    },
+    
+    sfxRocketLaunch() {
+        if(!this.ctx) return;
+        const t = this.ctx.currentTime;
+        this.playNoise(t, 0.3, 0.2, this.sfxGain);
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(200, t);
+        osc.frequency.exponentialRampToValueAtTime(600, t + 0.2);
+        gain.gain.setValueAtTime(0.1, t);
+        gain.gain.linearRampToValueAtTime(0, t+0.2);
+        osc.connect(gain); gain.connect(this.sfxGain);
+        osc.start(t); osc.stop(t+0.2);
+    },
+    
+    sfxFizzle() {
+        if(!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const bSize = this.ctx.sampleRate * 1.0;
+        const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+        const d = b.getChannelData(0);
+        for(let i=0; i<bSize; i++) d[i] = Math.random() * 2 - 1;
+        
+        const src = this.ctx.createBufferSource();
+        src.buffer = b;
+        const f = this.ctx.createBiquadFilter();
+        f.type = 'bandpass'; 
+        f.frequency.setValueAtTime(800, t);
+        f.frequency.linearRampToValueAtTime(100, t + 1.0);
+        
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.5, t);
+        gain.gain.linearRampToValueAtTime(0, t + 1.0);
+        
+        src.connect(f); f.connect(gain); gain.connect(this.sfxGain);
+        src.start(t);
+    },
+
+    createRocketLoop() {
+        if(!this.ctx) return { stop: ()=>{} };
+        const bSize = this.ctx.sampleRate * 1.0; 
+        const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+        const d = b.getChannelData(0);
+        for(let i=0; i<bSize; i++) d[i] = Math.random() * 2 - 1;
+
+        const src = this.ctx.createBufferSource();
+        src.buffer = b;
+        src.loop = true;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass'; filter.frequency.value = 400;
+        const gain = this.ctx.createGain();
+        gain.gain.value = 0.15; 
+        src.connect(filter); filter.connect(gain); gain.connect(this.sfxGain);
+        src.start();
+
+        return {
+            stop: () => {
+                const t = this.ctx.currentTime;
+                gain.gain.setTargetAtTime(0, t, 0.1);
+                src.stop(t + 0.1);
+            }
+        };
+    },
+    
+    createSirenLoop() {
+        if(!this.ctx) return { stop: ()=>{} };
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const lfo = this.ctx.createOscillator();
+        const lfoGain = this.ctx.createGain();
+        const gain = this.ctx.createGain();
+        
+        osc.type = 'square'; osc.frequency.value = 400; 
+        lfo.type = 'triangle'; lfo.frequency.value = 4; lfoGain.gain.value = 100;
+        
+        lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+        osc.connect(gain); gain.connect(this.sfxGain);
+        gain.gain.value = 0.05; 
+        
+        osc.start(); lfo.start();
+        return {
+            stop: () => {
+                const t = this.ctx.currentTime;
+                gain.gain.setTargetAtTime(0, t, 0.1);
+                osc.stop(t + 0.1); lfo.stop(t + 0.1);
+            }
+        };
+    },
+
+    sfxLaser() {
+        if(!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(1200, t);
+        osc.frequency.exponentialRampToValueAtTime(200, t + 0.2);
+        gain.gain.setValueAtTime(0.2, t);
+        gain.gain.linearRampToValueAtTime(0, t + 0.2);
+        osc.connect(gain); gain.connect(this.sfxGain);
+        osc.start(t); osc.stop(t+0.2);
+    },
+
+    sfxJump() {
+        if(!this.ctx || Math.random() > 0.4) return;
+        this.playOsc(150, 'square', this.ctx.currentTime, 0.05, 0.1, this.sfxGain);
+    }
+};
+
+/**
+ * =========================================
+ * GAME CONFIG & LOGIC
+ * =========================================
+ */
+const WEAPON_CONFIG = {
+    0: { name: "SHELL", type: "projectile", ammo: -1, radius: 53, damage: 40, color: "#ffffff", icon: "●" },
+    1: { name: "BOMB", type: "projectile", ammo: 3, radius: 106, damage: 70, color: "#ff0000", icon: "☀" },
+    2: { name: "SWARM", type: "barrage", ammo: 5, radius: 47, damage: 20, color: "#ffff00", icon: "∿" },
+    3: { name: "LASER", type: "laser", ammo: -1, baseDamage: 33, color: "#00ff00", icon: "⚡" },
+    4: { name: "AIR STRIKE", type: "flare", ammo: 1, radius: 60, damage: 50, color: "#00ffff", icon: "▼" },
+    5: { name: "SWEEP", type: "laser-sweep", ammo: -1, baseDamage: 66, color: "#ffaa00", icon: "⫚" },
+    6: { name: "NUKE", type: "projectile", ammo: 1, radius: 212, damage: 95, color: "#ff00ff", icon: "☢" }
+};
+
+// UI Gen
+const weaponPanel = document.getElementById('weapon-panel');
+Object.keys(WEAPON_CONFIG).forEach(key => {
+    const w = WEAPON_CONFIG[key];
+    const div = document.createElement('div');
+    div.className = 'weapon-card';
+    div.id = `w-${key}`;
+    div.innerHTML = `<div class="key-hint">${parseInt(key)+1}</div><div class="weapon-icon">${w.icon}</div><div>${w.name}</div><div class="weapon-ammo" id="ammo-${key}">INF</div>`;
+    weaponPanel.appendChild(div);
+});
+
+// Physics
+const GRAVITY = 0.25;
+const MAX_POWER = 25;
+const ROVER_WIDTH = 20;
+const ROVER_HEIGHT = 14;
+const MOVE_SPEED = 1.0;     
+const FLY_SPEED = 0.2;      
+const THRUST_FORCE = 0.35; 
+const LAVA_LEVEL_PCT = 0.92;
+const MAX_FUEL = 120;
+
+const canvasTerrain = document.getElementById('terrain-layer');
+const ctxTerrain = canvasTerrain.getContext('2d', { willReadFrequently: true });
+const canvasGame = document.getElementById('game-layer');
+const ctxGame = canvasGame.getContext('2d');
+
+let width, height;
+let rovers = [];
+let bullets = [];
+let fx = [];
+
+let currentTeamId = 0;
+let selectedRoverIndex = 0;
+let gameState = 'IDLE'; 
+let gameOver = false;
+
+let wind = 0;
+let chargePower = 0;
+let chargeDirection = 1;
+let lavaY = 0;
+
+const keys = {};
+
+function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvasTerrain.width = width;
+    canvasTerrain.height = height;
+    canvasGame.width = width;
+    canvasGame.height = height;
+    lavaY = height * LAVA_LEVEL_PCT;
+}
+
+window.addEventListener('resize', () => { resize(); initGame(); });
+
+function initGame() {
+    bullets.forEach(b => { if(b.flightSound) b.flightSound.stop(); });
+    
+    resize();
+    generateTerrain();
+    
+    rovers = [];
+    const segmentWidth = width / 6;
+    const padding = 50;
+    const spawnOrder = [0, 1, 0, 1, 0, 1];
+    let positions = [0, 1, 2, 3, 4, 5];
+    positions.sort(() => Math.random() - 0.5);
+
+    spawnOrder.forEach((teamId, i) => {
+        const segIndex = positions[i];
+        const minX = (segIndex * segmentWidth) + padding;
+        const maxX = ((segIndex + 1) * segmentWidth) - padding;
+        const x = minX + Math.random() * (maxX - minX);
+        const y = height * 0.1; 
+        const name = teamId === 0 ? "Vanguard" : "Syndicate";
+        const color = teamId === 0 ? "#00f3ff" : "#ff0055";
+        rovers.push(new Rover(x, y, name, color, teamId));
+    });
+    
+    wind = (Math.random() - 0.5) * 0.3;
+    startTurn(0);
+    requestAnimationFrame(gameLoop);
+}
+
+function generateTerrain() {
+    ctxTerrain.clearRect(0, 0, width, height);
+    const lavaGrad = ctxTerrain.createLinearGradient(0, lavaY, 0, height);
+    lavaGrad.addColorStop(0, '#ff4d00');
+    lavaGrad.addColorStop(1, '#500000');
+    ctxTerrain.fillStyle = lavaGrad;
+    ctxTerrain.fillRect(0, lavaY, width, height - lavaY);
+
+    ctxTerrain.beginPath();
+    ctxTerrain.moveTo(0, height); 
+    let baseHeight = height * 0.6;
+    const offsetA = Math.random() * 1000;
+    const offsetB = Math.random() * 1000;
+
+    for (let x = 0; x <= width; x += 10) {
+        let noise = Math.sin((x + offsetA) * 0.01) * 50 + Math.sin((x + offsetB) * 0.02) * 25 + Math.random() * 10;
+        let y = baseHeight + noise;
+        if (y > lavaY - 20) y = lavaY - 20;
+        ctxTerrain.lineTo(x, y);
+    }
+    ctxTerrain.lineTo(width, height);
+    ctxTerrain.lineTo(0, height);
+    ctxTerrain.fillStyle = '#1a1a1a';
+    ctxTerrain.fill();
+
+    ctxTerrain.globalCompositeOperation = 'source-over';
+    ctxTerrain.strokeStyle = '#888';
+    ctxTerrain.lineWidth = 2;
+    ctxTerrain.stroke();
+    
+    ctxTerrain.globalCompositeOperation = 'source-atop';
+    for(let i=0; i<5000; i++) {
+        ctxTerrain.fillStyle = Math.random() > 0.5 ? '#333' : '#000';
+        ctxTerrain.fillRect(Math.random()*width, Math.random()*height, 2, 2);
+    }
+    ctxTerrain.globalCompositeOperation = 'source-over';
+}
+
+function terrainRemoveCircle(x, y, radius) {
+    ctxTerrain.globalCompositeOperation = 'destination-out';
+    ctxTerrain.beginPath();
+    ctxTerrain.arc(x, y, radius, 0, Math.PI * 2);
+    ctxTerrain.fill();
+    ctxTerrain.globalCompositeOperation = 'source-over';
+}
+
+function terrainRemoveLine(x1, y1, x2, y2, thickness) {
+    ctxTerrain.globalCompositeOperation = 'destination-out';
+    ctxTerrain.beginPath();
+    ctxTerrain.lineWidth = thickness;
+    ctxTerrain.lineCap = 'round';
+    ctxTerrain.moveTo(x1, y1);
+    ctxTerrain.lineTo(x2, y2);
+    ctxTerrain.stroke();
+    ctxTerrain.globalCompositeOperation = 'source-over';
+}
+
+function checkPixelCollision(x, y) {
+    if (x < 0 || x >= width || y < 0 || y >= height) return false;
+    const p = ctxTerrain.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
+    return p[3] > 0;
+}
+
+function canMoveTo(x, currentY) {
+    if (x < 0 || x > width) return false;
+    let groundY = -1;
+    for (let scanY = Math.floor(currentY - 20); scanY < height; scanY++) {
+        if (scanY > 0 && checkPixelCollision(x, scanY)) {
+            groundY = scanY;
+            break;
+        }
+    }
+    if (groundY === -1) return true; 
+    const heightDiff = currentY - groundY; 
+    if (heightDiff > 2) return false;
+    return true;
+}
+
+// Classes
+class Rover {
+    constructor(x, y, name, color, teamId) {
+        this.x = x; this.y = y; this.name = name; this.color = color; this.teamId = teamId;
+        this.hp = 100; this.fuel = MAX_FUEL;
+        this.angle = -Math.PI / 4; 
+        if (teamId === 1) this.angle = -Math.PI * 0.75;
+        this.velX = 0; this.velY = 0; this.onGround = false; this.dead = false;
+        this.width = ROVER_WIDTH; this.height = ROVER_HEIGHT;
+        this.ammo = {};
+        Object.keys(WEAPON_CONFIG).forEach(k => {
+            this.ammo[k] = WEAPON_CONFIG[k].ammo;
+        });
+        this.currentWeaponId = 0;
+        this.animOffset = 0;
+        this.laserCooldown = 0;
+        this.sweepCooldown = 0;
+    }
+
+    update() {
+        if (this.dead) return;
+
+        if (this.y + this.height/2 >= lavaY) {
+            this.kill();
+            return;
+        }
+
+        this.velY += GRAVITY;
+
+        if (keys['ShiftLeft'] || keys['ShiftRight']) {
+            if (this === rovers[selectedRoverIndex] && gameState === 'IDLE' && this.fuel > 0) {
+                this.velY -= THRUST_FORCE;
+                this.fuel--;
+                fx.push(new Particle(this.x, this.y + 5, '#ffaa00', true));
+                AudioEngine.sfxJump();
+                updateUI();
+            }
+        }
+
+        let allowed = true;
+        if (this.onGround && Math.abs(this.velX) > 0.1) {
+            let lookAhead = this.velX > 0 ? 3 : -3;
+            if (!canMoveTo(this.x + lookAhead, this.y + this.height/2)) {
+                this.velX = 0; allowed = false;
+            }
+        }
+
+        if (allowed) this.x += this.velX;
+        this.y += this.velY;
+        
+        if (Math.abs(this.velX) > 0.1) this.animOffset += Math.abs(this.velX);
+
+        if (this.onGround) this.velX *= 0.8; else this.velX *= 0.99; 
+        
+        if (this.x < 0) { this.x = 0; this.velX = Math.abs(this.velX) * 0.5; }
+        if (this.x > width) { this.x = width; this.velX = -Math.abs(this.velX) * 0.5; }
+
+        if (checkPixelCollision(this.x, this.y + this.height/2)) {
+            this.onGround = true; this.velY = 0;
+            let safety = 0;
+            while (checkPixelCollision(this.x, this.y + this.height/2) && safety < 30) {
+                this.y -= 1; safety++;
+            }
+        } else {
+            this.onGround = false;
+        }
+
+        if (this.y > height) {
+            this.kill();
+        }
+    }
+    
+    kill() {
+        if(this.dead) return;
+        this.hp = 0;
+        this.dead = true;
+        AudioEngine.sfxCrunch();
+        terrainRemoveCircle(this.x, this.y, 20);
+        for(let i=0; i<40; i++) {
+            fx.push(new Particle(this.x, this.y, i%2==0 ? this.color : '#ffaa00', true));
+        }
+        
+        // Active turn death logic
+        if (!gameOver && this === rovers[selectedRoverIndex]) {
+            gameState = 'SETTLING';
+            setTimeout(nextTurn, 1000);
+        }
+        
+        checkWinCondition();
+    }
+
+    draw() {
+        if (this.dead) return;
+        ctxGame.save();
+        ctxGame.translate(this.x, this.y);
+
+        if (this === rovers[selectedRoverIndex]) {
+            ctxGame.save();
+            const pulse = (Math.sin(Date.now() / 200) + 1) / 2;
+            ctxGame.globalAlpha = 0.3 + (pulse * 0.4);
+            const bob = Math.sin(Date.now() / 300) * 4;
+            ctxGame.translate(0, 35 + bob);
+            ctxGame.fillStyle = this.color;
+            ctxGame.shadowBlur = 10; ctxGame.shadowColor = this.color;
+            ctxGame.beginPath();
+            ctxGame.moveTo(0, -6); ctxGame.lineTo(-6, 6); ctxGame.lineTo(0, 2); ctxGame.lineTo(6, 6);
+            ctxGame.closePath(); ctxGame.fill();
+            ctxGame.restore();
+        }
+
+        if (this === rovers[selectedRoverIndex] && gameState !== 'SETTLING') {
+            ctxGame.beginPath();
+            ctxGame.strokeStyle = this.color;
+            ctxGame.setLineDash([2, 2]);
+            ctxGame.moveTo(0, 0);
+            ctxGame.lineTo(Math.cos(this.angle) * 40, Math.sin(this.angle) * 40);
+            ctxGame.stroke();
+            ctxGame.setLineDash([]);
+        }
+
+        ctxGame.fillStyle = '#111';
+        ctxGame.strokeStyle = this.color;
+        ctxGame.lineWidth = 2;
+        ctxGame.shadowBlur = 10; ctxGame.shadowColor = this.color;
+
+        const treadOffset = (this.animOffset % 6);
+        ctxGame.beginPath();
+        ctxGame.arc(-7, 5, 4, 0, Math.PI*2);
+        ctxGame.arc(7, 5, 4, 0, Math.PI*2);
+        ctxGame.fill(); ctxGame.stroke();
+        ctxGame.save();
+        ctxGame.translate(-7, 5); ctxGame.rotate(this.animOffset * 0.5); 
+        ctxGame.beginPath(); ctxGame.moveTo(-4,0); ctxGame.lineTo(4,0); ctxGame.moveTo(0,-4); ctxGame.lineTo(0,4); 
+        ctxGame.strokeStyle='#555'; ctxGame.lineWidth=1; ctxGame.stroke();
+        ctxGame.restore();
+        ctxGame.save();
+        ctxGame.translate(7, 5); ctxGame.rotate(this.animOffset * 0.5); 
+        ctxGame.beginPath(); ctxGame.moveTo(-4,0); ctxGame.lineTo(4,0); ctxGame.moveTo(0,-4); ctxGame.lineTo(0,4); 
+        ctxGame.strokeStyle='#555'; ctxGame.lineWidth=1; ctxGame.stroke();
+        ctxGame.restore();
+
+        ctxGame.lineWidth = 2;
+        ctxGame.strokeStyle = this.color;
+        ctxGame.fillStyle = '#000';
+        ctxGame.beginPath();
+        ctxGame.moveTo(-10, 5);
+        ctxGame.lineTo(-12, -2);
+        ctxGame.lineTo(12, -2);
+        ctxGame.lineTo(10, 5);
+        ctxGame.closePath();
+        ctxGame.fill();
+        ctxGame.stroke();
+
+        ctxGame.save();
+        ctxGame.fillStyle = this.color;
+        ctxGame.beginPath();
+        ctxGame.arc(0, -3, 6, Math.PI, 0); 
+        ctxGame.fill();
+        ctxGame.strokeStyle = this.color;
+        ctxGame.lineWidth = 4;
+        ctxGame.beginPath();
+        ctxGame.moveTo(0, -3);
+        ctxGame.lineTo(Math.cos(this.angle) * 15, -3 + Math.sin(this.angle) * 15);
+        ctxGame.stroke();
+        ctxGame.restore();
+
+        ctxGame.fillStyle = '#fff';
+        ctxGame.shadowBlur = 0;
+        ctxGame.font = '10px Share Tech Mono';
+        ctxGame.textAlign = 'center';
+        ctxGame.fillText(this.hp + '%', 0, -20);
+        
+        ctxGame.restore();
+    }
+
+    equip(id) {
+        if (id === 6 && this.hp >= 50) return; // Nuke
+        
+        // Laser Cooldown check
+        if (id === 3 && this.laserCooldown > 0) return;
+        // Sweep Cooldown check
+        if (id === 5 && this.sweepCooldown > 0) return;
+
+        if (WEAPON_CONFIG[id]) {
+            this.currentWeaponId = id;
+            updateUI();
+        }
+    }
+}
+
+class Bullet {
+    constructor(x, y, angle, power, config, ownerColor, oscillation = null) {
+        this.x = x; this.y = y;
+        this.velX = Math.cos(angle) * power;
+        this.velY = Math.sin(angle) * power;
+        this.config = config; this.color = config.color;
+        this.active = true; this.trail = [];
+        this.oscillation = oscillation; 
+        this.age = 0; this.drawX = x; this.drawY = y;
+        
+        this.flightSound = null;
+        if (config.type === 'barrage') {
+            this.flightSound = AudioEngine.createRocketLoop();
+        } else if (config.name === 'NUKE') {
+            this.flightSound = AudioEngine.createSirenLoop();
+        } else if (config.type === 'flare') {
+            // Flare flight sound is silent or generic, handled by explode
+        }
+    }
+
+    update() {
+        if (!this.active) return;
+        
+        // Special logic for Air Strike Beacon
+        if (this.config.type === 'beacon') {
+            this.age++;
+            if (this.age > 60) { // 1 second fizzle
+                this.active = false;
+                
+                // Ballistic Calculation for Air Strike
+                // We want shells to land at this.x (targetX)
+                // We spawn them high up (startY).
+                // They have initial Y velocity (u), Gravity (g).
+                // We calculate time (t) to hit ground.
+                // We calculate wind displacement (drift).
+                // We launch at (targetX - drift).
+                
+                const targetX = this.x;
+                const u = 5; // Initial downward velocity
+                const g = GRAVITY; // 0.25
+                const a_quad = 0.5 * g; // 0.125
+                
+                for(let i=0; i<14; i++) {
+                    // Unique variance for each dropped shell (0.8 to 1.2 on top of reduced 0.7 base)
+                    let variance = 0.7 * (0.8 + (Math.random() * 0.4)); 
+                    const shellConfig = {
+                        ...WEAPON_CONFIG[0],
+                        radius: WEAPON_CONFIG[0].radius * variance,
+                        damage: WEAPON_CONFIG[0].damage * variance
+                    };
+
+                    const startY = -150 - (i*60); // Staggered spawn height
+                    const distanceY = this.y - startY;
+                    
+                    // Time to hit ground
+                    // 0.125*n^2 + (u+0.125)*n - distance = 0
+                    const b_quad = u + (0.5 * g); // 5.125
+                    const c_quad = -distanceY;
+                    
+                    const discrim = b_quad*b_quad - 4*a_quad*c_quad;
+                    let t = 0;
+                    if (discrim >= 0) {
+                        t = (-b_quad + Math.sqrt(discrim)) / (2 * a_quad);
+                    }
+                    
+                    // Wind Drift Calculation (Sum of arithmetic series for velocity + acceleration)
+                    const windDrift = wind * t * (t + 1) / 2;
+                    
+                    const scatter = (Math.random() - 0.5) * 60;
+                    const launchX = targetX - windDrift + scatter;
+                    
+                    bullets.push(new Bullet(launchX, startY, Math.PI/2, 5, shellConfig, this.color));
+                }
+            } else if (this.age % 5 === 0) {
+                fx.push(new Particle(this.x, this.y, '#fff', true));
+            }
+            return;
+        }
+
+        this.age++;
+        this.velX += wind;
+        this.velY += GRAVITY;
+        this.x += this.velX;
+        this.y += this.velY;
+
+        if (this.oscillation) {
+            const speed = Math.sqrt(this.velX*this.velX + this.velY*this.velY);
+            const perpX = -this.velY / (speed || 1);
+            const perpY = this.velX / (speed || 1);
+            const offset = Math.sin(this.age * this.oscillation.freq + this.oscillation.phase) * this.oscillation.amp;
+            this.drawX = this.x + perpX * offset;
+            this.drawY = this.y + perpY * offset;
+        } else {
+            this.drawX = this.x;
+            this.drawY = this.y;
+        }
+
+        this.trail.push({x: this.drawX, y: this.drawY});
+        if(this.trail.length > 5) this.trail.shift();
+
+        if (checkPixelCollision(this.drawX, this.drawY) || this.drawY >= lavaY) {
+            this.explode(); return;
+        }
+        if (this.drawX < 0 || this.drawX > width || this.drawY > height) {
+            this.explode(); return;
+        }
+
+        rovers.forEach(r => {
+            if (!r.dead) {
+                if (Math.hypot(this.drawX - r.x, this.drawY - r.y) < 15) this.explode();
+            }
+        });
+    }
+
+    draw() {
+        if (!this.active) return;
+        
+        if (this.config.type === 'beacon') {
+            ctxGame.fillStyle = (this.age % 10 < 5) ? '#fff' : '#00ffff';
+            ctxGame.beginPath(); ctxGame.arc(this.x, this.y, 4, 0, Math.PI*2); ctxGame.fill();
+            return;
+        }
+
+        ctxGame.beginPath();
+        ctxGame.strokeStyle = this.color;
+        ctxGame.lineWidth = 1;
+        this.trail.forEach((p, i) => {
+            if(i==0) ctxGame.moveTo(p.x, p.y);
+            else ctxGame.lineTo(p.x, p.y);
+        });
+        ctxGame.stroke();
+        ctxGame.fillStyle = '#fff';
+        ctxGame.shadowBlur = 5; ctxGame.shadowColor = this.color;
+        ctxGame.beginPath(); ctxGame.arc(this.drawX, this.drawY, 3, 0, Math.PI * 2); ctxGame.fill(); ctxGame.shadowBlur = 0;
+    }
+
+    explode() {
+        if(!this.active) return;
+        this.active = false;
+        
+        if(this.flightSound) {
+            this.flightSound.stop();
+            this.flightSound = null;
+        }
+
+        if (this.config.type === 'flare') {
+            // Become a beacon
+            const beacon = new Bullet(this.drawX, this.drawY, 0, 0, {type: 'beacon'}, this.color);
+            beacon.active = true;
+            bullets.push(beacon);
+            AudioEngine.sfxFizzle();
+            return; 
+        }
+
+        terrainRemoveCircle(this.drawX, this.drawY, this.config.radius);
+        
+        let hitRover = false;
+        rovers.forEach(r => {
+            if (r.dead) return;
+            const dist = Math.hypot(r.x - this.drawX, r.y - this.drawY);
+            const hitRadius = this.config.radius + 10;
+            if (dist < hitRadius) {
+                hitRover = true;
+                const damage = Math.floor((1 - dist / hitRadius) * this.config.damage);
+                if(damage > 0) {
+                    r.hp -= damage;
+                    const angle = Math.atan2(r.y - this.drawY, r.x - this.drawX);
+                    const force = (hitRadius - dist) / 5;
+                    r.velX += Math.cos(angle) * force;
+                    r.velY += Math.sin(angle) * force;
+                    r.y -= 2; 
+                    if (r.hp <= 0) r.kill();
+                }
+            }
+        });
+
+        if(hitRover) AudioEngine.sfxCrunch();
+        
+        if (this.config.name === 'BOMB') AudioEngine.sfxBombExplosion();
+        else if (this.config.name === 'NUKE') AudioEngine.sfxNukeExplosion();
+        else AudioEngine.sfxHeavyExplosion(); 
+
+        for(let i=0; i<15; i++) fx.push(new Particle(this.drawX, this.drawY, this.color, true));
+        checkTurnEnd();
+    }
+}
+
+class LaserBeam {
+    constructor(x1, y1, x2, y2, color, thickness) {
+        this.x1 = x1; this.y1 = y1; this.x2 = x2; this.y2 = y2;
+        this.color = color; this.thickness = thickness; this.life = 1.0;
+    }
+    update() { this.life -= 0.05; }
+    draw() {
+        if(this.life <= 0) return;
+        ctxGame.save();
+        ctxGame.globalAlpha = this.life;
+        ctxGame.strokeStyle = this.color;
+        ctxGame.lineWidth = this.thickness * this.life;
+        ctxGame.shadowBlur = 10; ctxGame.shadowColor = this.color;
+        ctxGame.lineCap = 'round';
+        ctxGame.beginPath(); ctxGame.moveTo(this.x1, this.y1); ctxGame.lineTo(this.x2, this.y2); ctxGame.stroke();
+        ctxGame.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, color, glowing) {
+        this.x = x; this.y = y;
+        this.vx = (Math.random() - 0.5) * 8;
+        this.vy = (Math.random() - 0.5) * 8;
+        this.life = 1.0; this.color = color; this.glowing = glowing;
+    }
+    update() {
+        this.x += this.vx; this.y += this.vy;
+        this.vy += GRAVITY; this.life -= 0.03;
+    }
+    draw() {
+        ctxGame.globalAlpha = this.life;
+        ctxGame.fillStyle = this.color;
+        if(this.glowing) { ctxGame.shadowBlur = 5; ctxGame.shadowColor = this.color; }
+        ctxGame.fillRect(this.x, this.y, 3, 3);
+        ctxGame.shadowBlur = 0; ctxGame.globalAlpha = 1.0;
+    }
+}
+
+// Logic
+function startTurn(teamId) {
+    if(gameOver) return;
+    currentTeamId = teamId;
+    gameState = 'IDLE';
+    wind = (Math.random() - 0.5) * 0.4;
+    
+    // Select unit
+    let candidates = rovers.map((r, i) => ({r, i})).filter(o => o.r.teamId === teamId && !o.r.dead);
+    if(candidates.length > 0) {
+        const currentR = rovers[selectedRoverIndex];
+        if (!rovers[selectedRoverIndex] || currentR.teamId !== teamId || currentR.dead) {
+            selectedRoverIndex = candidates[0].i;
+        }
+    }
+    
+    // Manage Cooldowns
+    rovers.forEach(r => { 
+        if(r.teamId === teamId) {
+            r.fuel = MAX_FUEL; 
+            if(r.laserCooldown > 0) r.laserCooldown--;
+            if(r.sweepCooldown > 0) r.sweepCooldown--;
+        }
+    });
+    
+    // Check if current weapon is locked by cooldown, if so switch to Shell
+    const active = rovers[selectedRoverIndex];
+    if(active) {
+        if(active.currentWeaponId === 3 && active.laserCooldown > 0) active.currentWeaponId = 0;
+        if(active.currentWeaponId === 5 && active.sweepCooldown > 0) active.currentWeaponId = 0;
+    }
+    
+    const turnText = document.getElementById('turn-indicator');
+    const teamName = teamId === 0 ? "VANGUARD" : "SYNDICATE";
+    const color = teamId === 0 ? "#00f3ff" : "#ff0055";
+    turnText.innerText = teamName + " TURN";
+    turnText.style.color = color;
+    turnText.style.opacity = 1;
+    setTimeout(() => { turnText.style.opacity = 0; }, 2000);
+    updateUI();
+}
+
+function checkTurnEnd() {
+    checkWinCondition();
+    if (!gameOver) {
+        if (bullets.some(b => b.active)) return;
+        gameState = 'SETTLING';
+        updateUI();
+        setTimeout(nextTurn, 2500);
+    }
+}
+
+function nextTurn() {
+    if (gameOver) return;
+    
+    bullets.forEach(b => { if(b.flightSound) b.flightSound.stop(); });
+    
+    let nextTeam = (currentTeamId + 1) % 2;
+    const nextAlive = rovers.filter(r => r.teamId === nextTeam && !r.dead).length;
+    if(nextAlive === 0) nextTeam = (nextTeam + 1) % 2; 
+    bullets = [];
+    startTurn(nextTeam);
+}
+
+function checkWinCondition() {
+    const t0Alive = rovers.filter(r => r.teamId === 0 && !r.dead).length;
+    const t1Alive = rovers.filter(r => r.teamId === 1 && !r.dead).length;
+    
+    if (t0Alive === 0 || t1Alive === 0) {
+        if(gameOver) return;
+        gameOver = true;
+        
+        bullets.forEach(b => { if(b.flightSound) b.flightSound.stop(); });
+        
+        let winner = "DRAW";
+        let color = "#fff";
+        if(t0Alive > 0) { winner = "VANGUARD WINS"; color = "#00f3ff"; }
+        else if(t1Alive > 0) { winner = "SYNDICATE WINS"; color = "#ff0055"; }
+        
+        setTimeout(() => {
+            const winText = document.getElementById('winner-text');
+            winText.innerText = winner;
+            winText.style.color = color;
+            winText.style.textShadow = `0 0 20px ${color}`;
+            document.getElementById('game-over').style.display = 'flex';
+        }, 500);
+    }
+}
+
+function updateUI() {
+    if (!rovers[selectedRoverIndex]) return; 
+    const t0Alive = rovers.filter(r => r.teamId === 0 && !r.dead).length;
+    const t1Alive = rovers.filter(r => r.teamId === 1 && !r.dead).length;
+    document.getElementById('p1-score').innerText = `VANGUARD: ${t0Alive} UNITS`;
+    document.getElementById('p2-score').innerText = `SYNDICATE: ${t1Alive} UNITS`;
+    let w = Math.round(wind * 100);
+    document.getElementById('wind-display').innerText = `WIND: ${w > 0 ? '>>' : '<<'} ${Math.abs(w)}`;
+    const rover = rovers[selectedRoverIndex];
+    
+    Object.keys(WEAPON_CONFIG).forEach(key => {
+        const i = parseInt(key);
+        const card = document.getElementById(`w-${i}`);
+        const ammoDisplay = document.getElementById(`ammo-${i}`);
+        if (i === rover.currentWeaponId) card.classList.add('active');
+        else card.classList.remove('active');
+        const ammoCount = rover.ammo[i];
+        ammoDisplay.innerText = ammoCount === -1 ? "INF" : ammoCount;
+
+        // Reset locks
+        card.classList.remove('locked');
+        card.classList.remove('cooldown');
+
+        // Nuke Lock (ID 6)
+        if (i === 6 && rover.hp >= 50) {
+            card.classList.add('locked');
+        }
+        // Laser Cooldown Lock (ID 3)
+        if (i === 3 && rover.laserCooldown > 0) {
+            card.classList.add('locked');
+            card.classList.add('cooldown'); 
+        }
+        // Sweep Cooldown Lock (ID 5)
+        if (i === 5 && rover.sweepCooldown > 0) {
+            card.classList.add('locked');
+            card.classList.add('cooldown'); 
+        }
+    });
+
+    const powerFill = document.getElementById('power-fill');
+    const fuelFill = document.getElementById('fuel-fill');
+    if (gameState === 'CHARGING') {
+        const pct = (chargePower / MAX_POWER) * 100;
+        powerFill.style.width = pct + '%';
+        powerFill.style.backgroundColor = rover.color;
+    } else {
+        powerFill.style.width = '0%';
+    }
+    const fuelPct = (rover.fuel / MAX_FUEL) * 100;
+    fuelFill.style.width = fuelPct + '%';
+}
+
+function toggleSettings() {
+    const el = document.getElementById('settings-menu');
+    el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
+}
+
+function toggleTrack() {
+    let next = (AudioEngine.currentTrackIndex + 1) % AudioEngine.songLibrary.length;
+    AudioEngine.setTrack(next);
+}
+
+window.addEventListener('keydown', (e) => {
+    AudioEngine.init(); 
+    if(e.code === 'Escape') { toggleSettings(); return; }
+    if (gameState === 'IDLE' && !gameOver) {
+        if (['1','2','3','4','5','6','7'].includes(e.key)) {
+            const id = parseInt(e.key) - 1;
+            rovers[selectedRoverIndex].equip(id);
+        }
+        if (e.code === 'ControlLeft' || e.code === 'ControlRight') {
+            const candidates = rovers.map((r, i) => ({r, i})).filter(o => o.r.teamId === currentTeamId && !o.r.dead);
+            if(candidates.length > 1) {
+                let currCandIdx = candidates.findIndex(o => o.i === selectedRoverIndex);
+                let nextCandIdx = (currCandIdx + 1) % candidates.length;
+                selectedRoverIndex = candidates[nextCandIdx].i;
+                updateUI();
+            }
+        }
+    }
+    keys[e.code] = true;
+});
+
+window.addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+    if (e.code === 'Space' && gameState === 'CHARGING') fire();
+});
+
+window.addEventListener('click', () => AudioEngine.init());
+document.getElementById('vol-music').addEventListener('input', (e) => {
+    AudioEngine.settings.music = e.target.value / 100;
+    AudioEngine.updateVolumes();
+    AudioEngine.saveSettings();
+});
+document.getElementById('vol-sfx').addEventListener('input', (e) => {
+    AudioEngine.settings.sfx = e.target.value / 100;
+    AudioEngine.updateVolumes();
+    AudioEngine.saveSettings();
+});
+
+function handleInput() {
+    if ((gameState !== 'IDLE' && gameState !== 'CHARGING') || gameOver) return;
+    const r = rovers[selectedRoverIndex];
+
+    if (gameState === 'IDLE') {
+        if (keys['ArrowLeft']) {
+            if (r.onGround) r.velX = -MOVE_SPEED; else r.velX -= FLY_SPEED;
+            if (r.angle > -Math.PI/2) r.angle = -Math.PI * 0.75;
+        } 
+        else if (keys['ArrowRight']) {
+            if (r.onGround) r.velX = MOVE_SPEED; else r.velX += FLY_SPEED;
+            if (r.angle < -Math.PI/2) r.angle = -Math.PI * 0.25;
+        }
+        
+        if (keys['ArrowUp']) r.angle -= 0.03;
+        if (keys['ArrowDown']) r.angle += 0.03;
+        
+        while(r.angle <= -Math.PI) r.angle += Math.PI*2;
+        while(r.angle > Math.PI) r.angle -= Math.PI*2;
+        
+        if (Math.sin(r.angle) > 0.707) {
+            if (Math.cos(r.angle) > 0) r.angle = Math.PI * 0.25; 
+            else r.angle = Math.PI * 0.75;
+        }
+
+        if (keys['Space']) {
+            if (r.ammo[r.currentWeaponId] !== 0) {
+                gameState = 'CHARGING';
+                chargePower = 0;
+                chargeDirection = 1;
+            }
+        }
+    } else if (gameState === 'CHARGING') {
+        chargePower += 0.4 * chargeDirection;
+        if (chargePower >= MAX_POWER || chargePower <= 0) chargeDirection *= -1;
+        updateUI();
+    }
+}
+
+function fire() {
+    const r = rovers[selectedRoverIndex];
+    const wId = r.currentWeaponId;
+    const config = WEAPON_CONFIG[wId];
+    if (r.ammo[wId] > 0) r.ammo[wId]--;
+    gameState = 'FIRING';
+    const bx = r.x + Math.cos(r.angle) * 20;
+    const by = r.y + Math.sin(r.angle) * 20;
+
+    if (config.type === 'projectile' || config.type === 'flare') {
+        bullets.push(new Bullet(bx, by, r.angle, chargePower, config, r.color));
+        if (config.type === 'flare') AudioEngine.sfxRocketLaunch();
+        else AudioEngine.sfxTankFire(); 
+        chargePower = 0;
+        updateUI();
+    } 
+    else if (config.type === 'barrage') {
+        for(let i=0; i<4; i++) {
+            const phase = (i % 2 === 0 ? 1 : -1) * (Math.PI / 4 * (i+1));
+            const freq = 0.15 + (i * 0.05);
+            const amp = 5 + (i * 2);
+            let swarmConfig = {...config};
+            if (i === 2) {
+                swarmConfig.radius *= 1.33;
+                swarmConfig.damage *= 1.33;
+            }
+            bullets.push(new Bullet(bx, by, r.angle, chargePower, swarmConfig, r.color, {freq, phase, amp}));
+        }
+        AudioEngine.sfxRocketLaunch();
+        chargePower = 0;
+        updateUI();
+    }
+    else if (config.type === 'laser') {
+        let pulseCount = 0;
+        const pulseInterval = setInterval(() => {
+            const pulseConfig = {...config, baseDamage: config.baseDamage / 3};
+            fireLaser(r, r.x + Math.cos(r.angle)*20, r.y + Math.sin(r.angle)*20, chargePower, pulseConfig, r.angle);
+            AudioEngine.sfxLaser();
+            pulseCount++;
+            if(pulseCount >= 3) {
+                clearInterval(pulseInterval);
+                setTimeout(checkTurnEnd, 500);
+            }
+        }, 150);
+        chargePower = 0;
+        updateUI();
+    }
+    else if (config.type === 'laser-sweep') {
+        // SWEEP LOGIC
+        r.laserCooldown = 2; // Disables standard laser for next turn (current turn end + 1)
+        r.sweepCooldown = 5; // Disables sweep for next 4 turns (current + 4)
+        
+        let pulseCount = 0;
+        const totalPulses = 12; 
+        const halfPulses = 6;
+        const sweepArc = 10 * Math.PI/180; 
+        
+        const centerAng = r.angle;
+        const upperAng = centerAng - (sweepArc / 2); 
+        const lowerAng = centerAng + (sweepArc / 2); 
+        
+        const sweepInterval = setInterval(() => {
+            const pulseConfig = {...config, baseDamage: config.baseDamage / totalPulses};
+            
+            let currentAng;
+            if (pulseCount < halfPulses) {
+                const progress = pulseCount / (halfPulses - 1);
+                currentAng = upperAng + (lowerAng - upperAng) * progress;
+            } else {
+                const progress = (pulseCount - halfPulses) / (halfPulses - 1);
+                currentAng = lowerAng - (lowerAng - upperAng) * progress;
+            }
+            
+            fireLaser(r, r.x + Math.cos(r.angle)*20, r.y + Math.sin(r.angle)*20, chargePower, pulseConfig, currentAng);
+            AudioEngine.sfxLaser();
+            pulseCount++;
+            if(pulseCount >= totalPulses) {
+                clearInterval(sweepInterval);
+                setTimeout(checkTurnEnd, 500);
+            }
+        }, 60); 
+        chargePower = 0;
+        updateUI();
+    }
+}
+
+function fireLaser(owner, startX, startY, power, config, angle) {
+    const refDist = width / 4 * 1.2;
+    let cx = startX + Math.cos(angle) * 5; 
+    let cy = startY + Math.sin(angle) * 5;
+    const dx = Math.cos(angle); 
+    const dy = Math.sin(angle);
+    let dist = 0; let hit = false;
+    let hitRover = false;
+    
+    while (!hit && dist < width * 1.5) {
+        cx += dx * 4; cy += dy * 4; dist += 4;
+        if (checkPixelCollision(cx, cy)) hit = true;
+        for (let r of rovers) {
+            if (r !== owner && !r.dead) {
+                if (Math.hypot(cx - r.x, cy - r.y) < 20) {
+                    hit = true; hitRover = true;
+                    let dmgCalc = config.baseDamage * (refDist / Math.max(dist, 10));
+                    let dmg = Math.min(dmgCalc, config.baseDamage);
+                    r.hp -= Math.floor(dmg);
+                    r.velX += dx * 3.0; 
+                    r.velY += dy * 3.0; 
+                    if (r.hp <= 0) r.kill();
+                }
+            }
+        }
+        if (cx<0 || cx>width || cy>height || cy>lavaY) hit = true;
+    }
+    
+    fx.push(new LaserBeam(startX, startY, cx, cy, config.color, 12));
+    if(hitRover) AudioEngine.sfxCrunch();
+    
+    if (checkPixelCollision(cx, cy)) {
+        let impactPower = (refDist / Math.max(dist, 50)); 
+        let holeWidth = 7 * impactPower; 
+        if(holeWidth < 8) holeWidth = 8;
+        terrainRemoveLine(cx, cy, cx + dx*holeWidth*6, cy + dy*holeWidth*6, holeWidth);
+        for(let i=0; i<15; i++) fx.push(new Particle(cx, cy, config.color, true));
+    }
+}
+
+function gameLoop() {
+    ctxGame.clearRect(0, 0, width, height);
+    handleInput();
+    rovers.forEach(r => { r.update(); r.draw(); });
+    bullets.forEach(b => { b.update(); b.draw(); });
+    bullets = bullets.filter(b => b.active);
+    for (let i = fx.length - 1; i >= 0; i--) {
+        fx[i].update(); fx[i].draw();
+        if (fx[i].life <= 0) fx.splice(i, 1);
+    }
+    requestAnimationFrame(gameLoop);
+}
+
+initGame();
+</script>
+</body>
+</html>
