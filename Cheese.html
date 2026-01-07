@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extreme Cheese Rolling Simulator 2000</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #333;
+            font-family: 'Comic Neue', sans-serif;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI Overlay Styles */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        .menu-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #ffcc00, #ff9900);
+            border: 5px solid #fff;
+            box-shadow: 10px 10px 0px #000;
+            padding: 20px;
+            text-align: center;
+            pointer-events: auto;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        h1 {
+            font-family: 'Bangers', cursive;
+            font-size: 2.5rem;
+            color: #d32f2f;
+            text-shadow: 2px 2px #fff, 4px 4px #000;
+            margin: 0 0 15px 0;
+            letter-spacing: 2px;
+            transform: rotate(-2deg);
+        }
+
+        .cheese-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .cheese-btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            font-family: 'Bangers', cursive;
+            font-size: 1.2rem;
+            color: white;
+            background-color: #007bff;
+            border: 3px solid #000;
+            cursor: pointer;
+            transition: transform 0.1s;
+            text-transform: uppercase;
+            box-shadow: 3px 3px 0 #000;
+        }
+
+        .cheese-btn:hover {
+            transform: scale(1.05) rotate(1deg);
+            background-color: #0056b3;
+        }
+
+        .cheese-btn:active {
+            transform: scale(0.95);
+            box-shadow: 1px 1px 0 #000;
+        }
+
+        #stats-panel {
+            font-family: 'Bangers', cursive;
+            font-size: 2rem;
+            color: #fff;
+            text-shadow: 2px 2px 0 #000;
+            text-align: right;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: none;
+        }
+
+        #commentary {
+            font-size: 1.2rem;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            margin-bottom: 50px;
+            border: 2px solid white;
+            display: none;
+            max-width: 80%;
+            text-align: center;
+            transition: transform 0.1s;
+        }
+
+        #result-screen {
+            display: none;
+        }
+
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui-layer">
+        
+        <!-- Main Menu -->
+        <div id="start-screen" class="menu-screen">
+            <h1>Cooper's Hill Simulator</h1>
+            <p style="font-weight:bold; font-size: 1.2rem;">Select your Racer!</p>
+            
+            <div class="cheese-grid">
+                <button class="cheese-btn" onclick="startGame('double')">Double Gloucester<br><span style="font-size:0.8rem">(The Classic)</span></button>
+                <button class="cheese-btn" style="background-color: #e6c229; color: black;" onclick="startGame('gouda')">Baby Gouda<br><span style="font-size:0.8rem">(Speedy)</span></button>
+                <button class="cheese-btn" style="background-color: #fcebeb; color: black;" onclick="startGame('brie')">Wheel of Brie<br><span style="font-size:0.8rem">(Squishy)</span></button>
+                <button class="cheese-btn" style="background-color: #d16b1e;" onclick="startGame('block')">Cheddar Block<br><span style="font-size:0.8rem">(Mistake)</span></button>
+                <button class="cheese-btn" style="background-color: #D9381E;" onclick="startGame('edam')">Triangle of Edam<br><span style="font-size:0.8rem">(Chaotic)</span></button>
+                <button class="cheese-btn" style="background-color: #F0F8FF; color:blue;" onclick="startGame('stilton')">Half a Stilton<br><span style="font-size:0.8rem">(Crumbling)</span></button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div id="stats-panel">
+            Speed: <span id="speed-display">0</span> km/h<br>
+            Distance: <span id="dist-display">0</span> m
+        </div>
+
+        <!-- Commentary Box -->
+        <div id="commentary">Ready to roll...</div>
+
+        <!-- Results -->
+        <div id="result-screen" class="menu-screen">
+            <h1 id="result-title">FINISHED!</h1>
+            <p id="result-text" style="font-size: 1.5rem; margin-bottom: 20px;"></p>
+            <button class="cheese-btn" onclick="resetGame()">Roll Again?</button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    /**
+     * GAME CONFIGURATION & STATE
+     */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Game State
+    let gameState = 'MENU'; 
+    let particles = [];
+    let cameraX = 0;
+    let cameraY = 0; 
+    let startTime = 0;
+    
+    // Physics Constants
+    const GRAVITY = 0.5;
+    const FINISH_LINE_X = 5000;
+    
+    // The Hill
+    let terrain = [];
+    let crowd = []; // The spectators
+
+    // Stickman AI
+    let man = {
+        active: false,
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        height: 60,
+        state: 'RUNNING', // RUNNING, BRAKING, KICKING, DAZED, RECOVERING, CELEBRATING
+        animFrame: 0,
+        direction: 1,
+        dazedTimer: 0,
+        cooldown: 0
+    };
+    
+    // The Cheese Object
+    let cheese = {
+        type: 'double',
+        x: 50,
+        y: 190,
+        vx: 0,
+        vy: 0,
+        angle: 0,
+        vAngle: 0,
+        radius: 20,
+        color: 'orange',
+        mass: 1,
+        bounciness: 0.6,
+        friction: 0.98,
+        shape: 'circle' // circle, rect, triangle, semicircle
+    };
+
+    /**
+     * SETUP
+     */
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function generateHill() {
+        terrain = [];
+        let y = 200;
+        // Start flat
+        for(let x = -200; x < 200; x+=20) {
+            terrain.push({x: x, y: y});
+        }
+        
+        // The descent
+        for(let x = 200; x <= FINISH_LINE_X + 200; x += 50) {
+            let noise = Math.random() * 20 - 10;
+            let slope = 25; 
+            if(Math.random() > 0.8) slope = -5; // A bump
+            if(Math.random() > 0.9) slope = 60; // A drop
+
+            y += slope + noise;
+            terrain.push({x: x, y: y});
+        }
+
+        // Runout area (Crowd zone) - Flat with slight slope
+        for(let x = FINISH_LINE_X + 250; x < FINISH_LINE_X + 2500; x+=50) {
+             y += 2;
+             terrain.push({x: x, y: y});
+        }
+    }
+
+    function generateCrowd() {
+        crowd = [];
+        let colors = ['#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#f1c40f', '#fff'];
+        
+        // Create crowd past the finish line
+        for(let x = FINISH_LINE_X + 200; x < FINISH_LINE_X + 1500; x += 30 + Math.random() * 40) {
+            crowd.push({
+                x: x,
+                y: 0, // Calculated later
+                color: colors[Math.floor(Math.random() * colors.length)],
+                height: 50 + Math.random() * 10,
+                state: 'CHEERING',
+                jumpOffset: Math.random() * 10
+            });
+        }
+    }
+
+    generateHill();
+
+    /**
+     * GAME LOOP
+     */
+    let lastTime = 0;
+    function loop(timestamp) {
+        const dt = timestamp - lastTime;
+        lastTime = timestamp;
+
+        update();
+        draw();
+
+        requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+
+    function startGame(type) {
+        generateHill();
+        generateCrowd();
+        
+        // Reset Cheese Physics
+        cheese.x = 50;
+        cheese.y = 100;
+        cheese.vx = 8;
+        cheese.vy = 0;
+        cheese.angle = 0;
+        cheese.vAngle = 0;
+        particles = [];
+        cameraX = 0;
+        cameraY = 0;
+        
+        // Reset Stickman
+        man.active = true;
+        man.x = -50; 
+        man.y = 190;
+        man.vx = 8; 
+        man.vy = 0;
+        man.state = 'RUNNING';
+        man.cooldown = 0;
+        man.dazedTimer = 0;
+        
+        // Cheese Stats Logic
+        cheese.type = type;
+        cheese.mass = 1;
+        cheese.bounciness = 0.6;
+        cheese.friction = 0.98;
+        
+        if (type === 'double') {
+            cheese.radius = 25;
+            cheese.color = '#FFAE00';
+            cheese.mass = 1.2;
+            cheese.shape = 'circle';
+            setCommentary("The Double Gloucester! A heavy hitter.");
+        } else if (type === 'gouda') {
+            cheese.radius = 15;
+            cheese.color = '#E6C229';
+            cheese.mass = 0.8;
+            cheese.bounciness = 0.8;
+            cheese.friction = 0.995; 
+            cheese.shape = 'circle';
+            setCommentary("Baby Gouda! Small and aerodynamic.");
+        } else if (type === 'brie') {
+            cheese.radius = 30;
+            cheese.color = '#FFFDD0';
+            cheese.mass = 1.0;
+            cheese.bounciness = 0.2; 
+            cheese.friction = 0.95; 
+            cheese.shape = 'circle'; 
+            setCommentary("Wheel of Brie. Soft and squishy.");
+        } else if (type === 'block') {
+            cheese.radius = 30;
+            cheese.color = '#D16B1E';
+            cheese.mass = 1.5;
+            cheese.bounciness = 0.3;
+            cheese.friction = 0.92; 
+            cheese.shape = 'rect';
+            setCommentary("A block? Physics hates this.");
+        } else if (type === 'edam') {
+            cheese.radius = 25;
+            cheese.color = '#D9381E'; // Red wax
+            cheese.mass = 1.1;
+            cheese.bounciness = 0.85;
+            cheese.friction = 0.96;
+            cheese.shape = 'triangle';
+            setCommentary("Triangle of Edam. This will end badly.");
+        } else if (type === 'stilton') {
+            cheese.radius = 30;
+            cheese.color = '#F0F8FF'; 
+            cheese.mass = 1.0;
+            cheese.bounciness = 0.4;
+            cheese.friction = 0.94;
+            cheese.shape = 'semicircle';
+            setCommentary("Half a Stilton. It's already falling apart!");
+        }
+
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('result-screen').style.display = 'none';
+        document.getElementById('stats-panel').style.display = 'block';
+        document.getElementById('commentary').style.display = 'block';
+        
+        gameState = 'RACING';
+        startTime = Date.now();
+    }
+
+    function resetGame() {
+        document.getElementById('start-screen').style.display = 'block';
+        document.getElementById('result-screen').style.display = 'none';
+        document.getElementById('stats-panel').style.display = 'none';
+        document.getElementById('commentary').style.display = 'none';
+        gameState = 'MENU';
+        
+        cheese.x = 50;
+        cheese.y = 190;
+        cheese.angle = 0;
+        cameraX = 0;
+        cameraY = 0;
+        man.active = false;
+    }
+
+    function finishGame() {
+        // Only trigger UI once
+        if(document.getElementById('result-screen').style.display === 'block') return;
+
+        let time = ((Date.now() - startTime) / 1000).toFixed(2);
+        
+        let msg = "";
+        if(cheese.type === 'block') msg = "It got there eventually...";
+        else if (cheese.radius < 5) msg = "There's no cheese left!";
+        else if(time < 20) msg = "New World Record?!";
+        else msg = "Not bad, for a dairy product.";
+
+        document.getElementById('result-title').innerText = time + "s";
+        document.getElementById('result-text').innerText = msg;
+        document.getElementById('result-screen').style.display = 'block';
+        
+        // Stickman stops and cheers at line
+        man.vx = 0;
+        man.state = 'CELEBRATING';
+    }
+
+    /**
+     * UPDATE PHYSICS
+     */
+    function update() {
+        // Camera Update
+        let targetCamX = cheese.x - canvas.width * 0.3;
+        let targetCamY = cheese.y - canvas.height * 0.6;
+        if (targetCamX < 0) targetCamX = 0;
+        if (targetCamY < 0) targetCamY = 0; 
+        cameraX += (targetCamX - cameraX) * 0.1;
+        cameraY += (targetCamY - cameraY) * 0.1;
+
+        if (gameState !== 'RACING') return;
+
+        /** CHEESE PHYSICS **/
+        if (cheese.type === 'stilton' && Math.random() < 0.05 && cheese.vx > 2) {
+            cheese.radius *= 0.995;
+            createParticles(cheese.x, cheese.y + cheese.radius, 1, '#66ccff');
+        }
+
+        cheese.vy += GRAVITY * cheese.mass;
+        cheese.vx *= 0.999; 
+        cheese.x += cheese.vx;
+        cheese.y += cheese.vy;
+        cheese.angle += cheese.vAngle;
+
+        let groundY = getTerrainHeight(cheese.x);
+        let slopeNext = getTerrainHeight(cheese.x + 10);
+        let slopePrev = getTerrainHeight(cheese.x - 10);
+        let slopeAngle = Math.atan2(slopeNext - slopePrev, 20);
+
+        let effectiveRadius = cheese.radius;
+        let rotationFactor = Math.abs(Math.sin(cheese.angle * (cheese.shape === 'rect' ? 2 : cheese.shape === 'triangle' ? 3 : 1)));
+        
+        if(cheese.shape === 'rect') effectiveRadius = cheese.radius * (1 + rotationFactor * 0.3);
+        else if (cheese.shape === 'triangle') effectiveRadius = cheese.radius * (0.8 + rotationFactor * 0.4);
+        else if (cheese.shape === 'semicircle') effectiveRadius = cheese.radius * (0.8 + Math.abs(Math.sin(cheese.angle)) * 0.3);
+
+        if (cheese.y + effectiveRadius > groundY) {
+            cheese.y = groundY - effectiveRadius;
+            if (cheese.vy > 2.5) {
+                cheese.vy *= -cheese.bounciness;
+                if(cheese.shape !== 'circle') {
+                    cheese.vAngle += (Math.random() - 0.5) * 1.0;
+                    cheese.vx *= 0.8; 
+                    if(cheese.type === 'stilton') createParticles(cheese.x, cheese.y + cheese.radius, 5, '#F0F8FF');
+                }
+            } else {
+                let slopeAccel = Math.sin(slopeAngle) * 0.8;
+                cheese.vx += slopeAccel;
+                cheese.vx *= cheese.friction;
+                cheese.vy = 0; 
+                let rotDiv = cheese.radius;
+                if(cheese.shape !== 'circle') rotDiv *= 1.5;
+                cheese.vAngle = cheese.vx / rotDiv;
+            }
+        }
+
+        updateStickman();
+        updateCrowd();
+
+        if(Math.random() < 0.01 && man.state === 'RUNNING') updateCommentary();
+        
+        if (cheese.y > 100000) {
+            cheese.y = 0; cheese.vy = 0;
+            setCommentary("Void detected. Resetting.");
+        }
+
+        if(cheese.x > FINISH_LINE_X) {
+            finishGame();
+        }
+
+        document.getElementById('speed-display').innerText = Math.abs(Math.round(cheese.vx * 3));
+        document.getElementById('dist-display').innerText = Math.round(cheese.x / 10);
+
+        updateParticles();
+    }
+
+    function updateCrowd() {
+        let time = Date.now() / 200;
+        
+        crowd.forEach(person => {
+            let h = getTerrainHeight(person.x);
+            
+            if (person.state === 'CHEERING') {
+                // Check Collision with Cheese
+                let dist = Math.sqrt(Math.pow(cheese.x - person.x, 2) + Math.pow(cheese.y - h, 2));
+                
+                if (dist < cheese.radius + 15) {
+                    // SQUASHED!
+                    person.state = 'SQUASHED';
+                    createParticles(person.x, h - 20, 10, person.color);
+                    
+                    // Slow down cheese slightly per person hit
+                    if(cheese.vx > 5) {
+                        cheese.vx *= 0.96; 
+                        setCommentary("STRIKE!");
+                    } else if (cheese.vx > 0) {
+                         cheese.vx *= 0.9;
+                    }
+                } else {
+                    // Jump animation when cheese gets close
+                    if (cheese.x > FINISH_LINE_X - 1000) {
+                        let jump = Math.sin(time + person.jumpOffset);
+                        if (jump > 0.5) person.y = h - (jump * 15);
+                        else person.y = h;
+                    } else {
+                        person.y = h;
+                    }
+                }
+            } else {
+                person.y = h; // Stay squashed on ground
+            }
+        });
+    }
+
+    function updateStickman() {
+        if (!man.active) return;
+
+        let manGroundY = getTerrainHeight(man.x);
+        man.y = manGroundY; 
+
+        // Stop stickman at finish line
+        if (man.x > FINISH_LINE_X - 50 && man.state !== 'CELEBRATING' && man.state !== 'DAZED') {
+            man.vx *= 0.9;
+            if(Math.abs(man.vx) < 0.5) {
+                 man.state = 'CELEBRATING';
+                 man.vx = 0;
+            }
+            man.x += man.vx;
+            return;
+        }
+        
+        if(man.state === 'CELEBRATING') {
+             man.animFrame += 0.2;
+             return; // Don't do chase logic
+        }
+
+        let distToCheese = cheese.x - man.x;
+        let isCheeseStopped = Math.abs(cheese.vx) < 1 && Math.abs(cheese.vy) < 1;
+        
+        // Cooldown timer
+        if (man.cooldown > 0) man.cooldown--;
+
+        // --- STATES ---
+        if (man.state === 'DAZED') {
+            man.dazedTimer--;
+            man.vx = 0;
+            if(man.dazedTimer <= 0) {
+                man.state = 'RECOVERING';
+                man.dazedTimer = 20; 
+                setCommentary("He's scrambling up!");
+            }
+        }
+        else if (man.state === 'RECOVERING') {
+            man.dazedTimer--;
+            if(man.dazedTimer <= 0) {
+                man.state = 'RUNNING';
+                man.cooldown = 40; // immunity
+            }
+        }
+        else if (man.state === 'KICKING') {
+            man.vx = 0;
+            man.animFrame += 0.2;
+            if (man.animFrame >= 2 && man.animFrame < 2.3) {
+                // INCREASED KICK POWER
+                cheese.vx = 12; // Was 8
+                cheese.vy = -8; // Bit more lift
+                cheese.vAngle = 0.5;
+                createParticles(cheese.x, cheese.y, 5, 'white');
+                setCommentary("A SOLID BOOT!");
+            }
+            if (man.animFrame > 5) {
+                man.state = 'RUNNING';
+                man.animFrame = 0;
+            }
+        }
+        else if (man.state === 'RUNNING' || man.state === 'BRAKING') {
+            
+            // MOVEMENT AI
+            if (isCheeseStopped) {
+                let targetX = cheese.x - 40;
+                if (man.x < targetX - 10) {
+                    man.vx += 0.5; 
+                    man.state = 'RUNNING';
+                } else if (man.x > targetX + 10) {
+                    man.vx -= 0.5; 
+                    man.state = 'RUNNING';
+                } else {
+                    man.vx = 0;
+                    man.state = 'KICKING';
+                    man.animFrame = 0;
+                }
+            } else {
+                // Race logic
+                if (distToCheese > 200) {
+                    man.vx += 0.5; 
+                    man.state = 'RUNNING';
+                } else if (distToCheese < -30) {
+                    // Try to brake if too far ahead, but not instantly stop
+                    man.vx -= 0.6;
+                    man.state = 'BRAKING';
+                } else {
+                    // Try to be faster than cheese to overtake
+                    if (man.vx < cheese.vx + 3) man.vx += 0.3;
+                    else man.vx -= 0.1;
+                    man.state = 'RUNNING';
+                }
+            }
+
+            if (man.vx > 18) man.vx = 18;
+            if (man.vx < -5) man.vx = -5;
+            
+            man.x += man.vx;
+            man.animFrame += Math.abs(man.vx) * 0.05;
+
+            // --- COLLISION LOGIC ---
+            // Widen overlap check slightly
+            if (Math.abs(distToCheese) < cheese.radius + 15 && man.cooldown <= 0) {
+                
+                let isFlyingOver = cheese.y < man.y - 80;
+                
+                if (!isFlyingOver) {
+                    // Check if cheese is overtaking (moving faster than man)
+                    if (cheese.vx > man.vx) {
+                        
+                        // 50/50 Chance
+                        if (Math.random() < 0.5) {
+                             // Hit!
+                             setCommentary("SQUASHED!");
+                             man.state = 'DAZED';
+                             man.dazedTimer = 60; // 1 second (fast recovery)
+                             createParticles(man.x, man.y - 30, 10, 'red'); 
+                             cheese.vx *= 0.9; 
+                        } else {
+                             // Dodge!
+                             if(Math.random()<0.3) setCommentary("Whoa! Close one!");
+                             man.cooldown = 40; // Immune
+                        }
+                    } 
+                    else if (man.vx > cheese.vx) {
+                        // Man ran into back of cheese
+                        man.x = cheese.x - (cheese.radius + 16);
+                        man.vx = cheese.vx; // Match speed (blocked)
+                    }
+                }
+            }
+        }
+    }
+
+    function getTerrainHeight(x) {
+        if (terrain.length === 0) return 500;
+        if(x < terrain[0].x) return terrain[0].y;
+        if(x >= terrain[terrain.length-1].x) return terrain[terrain.length-1].y;
+
+        for(let i = 0; i < terrain.length - 1; i++) {
+            if (x >= terrain[i].x && x < terrain[i+1].x) {
+                let t = (x - terrain[i].x) / (terrain[i+1].x - terrain[i].x);
+                return terrain[i].y + t * (terrain[i+1].y - terrain[i].y);
+            }
+        }
+        return 500;
+    }
+
+    /**
+     * VISUALS
+     */
+    function draw() {
+        if (terrain.length === 0) return;
+
+        let grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grd.addColorStop(0, "#4facfe");
+        grd.addColorStop(1, "#00f2fe");
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.translate(-cameraX, -cameraY);
+
+        // Draw Finish Line Arch
+        let finishY = getTerrainHeight(FINISH_LINE_X);
+        ctx.fillStyle = "#333";
+        ctx.fillRect(FINISH_LINE_X, finishY - 300, 20, 300); // Left post
+        ctx.fillRect(FINISH_LINE_X + 250, finishY - 300, 20, 300); // Right post (width of track visual)
+        
+        // Banner
+        ctx.fillStyle = "#d32f2f";
+        ctx.fillRect(FINISH_LINE_X - 10, finishY - 320, 290, 60);
+        ctx.fillStyle = "white";
+        ctx.font = "bold 40px 'Bangers'";
+        ctx.fillText("FINISH", FINISH_LINE_X + 80, finishY - 280);
+
+        // Terrain
+        ctx.beginPath();
+        if (terrain.length > 0) {
+            ctx.moveTo(terrain[0].x, terrain[0].y);
+            for(let i = 1; i < terrain.length; i++) {
+                ctx.lineTo(terrain[i].x, terrain[i].y);
+            }
+            let deepBottom = Math.max(cheese.y + 2000, terrain[terrain.length-1].y + 2000);
+            ctx.lineTo(terrain[terrain.length-1].x, deepBottom);
+            ctx.lineTo(terrain[0].x, deepBottom);
+            ctx.closePath();
+            ctx.fillStyle = "#4CAF50"; 
+            ctx.fill();
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = "#2E7D32";
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = "20px 'Comic Neue'";
+        for(let i=0; i<FINISH_LINE_X; i+=500) {
+            let h = getTerrainHeight(i);
+            ctx.fillText(i/10 + "m", i, h + 40);
+        }
+
+        drawCrowd(); // Draw the spectators
+        drawStickman();
+        
+        for(let p of particles) {
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+        }
+
+        drawCheese();
+
+        ctx.restore();
+    }
+
+    function drawCrowd() {
+        crowd.forEach(p => {
+            let x = p.x;
+            let y = p.y;
+            let h = p.height;
+
+            ctx.save();
+            ctx.translate(x, y);
+
+            if (p.state === 'SQUASHED') {
+                ctx.scale(1.5, 0.2); // Squashed flat
+                ctx.translate(0, 100);
+            }
+
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            
+            // Stick figure
+            // Body
+            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0, -h); ctx.stroke();
+            // Head
+            ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(0, -h, 8, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            
+            // Arms (Cheering)
+            if (p.state === 'CHEERING') {
+                ctx.beginPath(); 
+                ctx.moveTo(0, -h+15); ctx.lineTo(-10, -h-10);
+                ctx.moveTo(0, -h+15); ctx.lineTo(10, -h-10);
+                ctx.stroke();
+                
+                // Legs
+                ctx.beginPath();
+                ctx.moveTo(0,0); ctx.lineTo(-5, 10);
+                ctx.moveTo(0,0); ctx.lineTo(5, 10);
+                ctx.stroke();
+            } else {
+                // Arms (Splat)
+                ctx.beginPath(); 
+                ctx.moveTo(0, -h+15); ctx.lineTo(-15, -h+10);
+                ctx.moveTo(0, -h+15); ctx.lineTo(15, -h+10);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        });
+    }
+
+    function drawStickman() {
+        if (!man.active) return;
+        
+        let x = man.x;
+        let y = man.y;
+        let h = man.height;
+        
+        ctx.save();
+        ctx.translate(x, y);
+        
+        let slopeNext = getTerrainHeight(x + 5);
+        let slopePrev = getTerrainHeight(x - 5);
+        let slope = Math.atan2(slopeNext - slopePrev, 10);
+        
+        if (man.state === 'DAZED' || man.state === 'RECOVERING') {
+            ctx.rotate(slope - Math.PI/2); 
+        } else {
+            ctx.rotate(slope);
+        }
+
+        ctx.scale(man.direction, 1);
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+
+        if (man.state === 'DAZED') {
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -h); ctx.stroke();
+            ctx.beginPath(); ctx.arc(0, -h, 10, 0, Math.PI*2); ctx.fillStyle="white"; ctx.fill(); ctx.stroke();
+            ctx.fillStyle = "yellow"; ctx.fillText("*", 10, -h-10); ctx.fillText("*", -10, -h-20);
+        } else if (man.state === 'RUNNING' || man.state === 'BRAKING') {
+            let lean = man.state === 'BRAKING' ? -0.2 : 0.2;
+            ctx.rotate(lean);
+            ctx.beginPath(); ctx.arc(0, -h, 10, 0, Math.PI*2); ctx.fillStyle="white"; ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, -h + 10); ctx.lineTo(0, -h/2); ctx.stroke();
+            let swing = Math.sin(man.animFrame) * 15;
+            ctx.beginPath(); ctx.moveTo(0, -h/2); ctx.lineTo(swing, 0); ctx.moveTo(0, -h/2); ctx.lineTo(-swing, 0); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, -h * 0.8); ctx.lineTo(-swing, -h/2); ctx.moveTo(0, -h * 0.8); ctx.lineTo(swing, -h/2); ctx.stroke();
+            if (man.state === 'BRAKING' && Math.random()>0.5) createParticles(man.x, man.y, 1, 'gray');
+        } else if (man.state === 'KICKING') {
+            let kickSwing = Math.min(man.animFrame * 10, 30);
+            ctx.beginPath(); ctx.arc(0, -h, 10, 0, Math.PI*2); ctx.fillStyle="white"; ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, -h + 10); ctx.lineTo(0, -h/2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, -h/2); ctx.lineTo(-10, 0); ctx.moveTo(0, -h/2); ctx.lineTo(20, -kickSwing); ctx.stroke();
+        } else if (man.state === 'CELEBRATING') {
+             ctx.translate(0, -10 + Math.sin(Date.now()/100)*10);
+             ctx.beginPath(); ctx.arc(0, -h, 10, 0, Math.PI*2); ctx.fillStyle="white"; ctx.fill(); ctx.stroke();
+             ctx.beginPath(); ctx.moveTo(0, -h + 10); ctx.lineTo(0, -h/2); ctx.stroke();
+             ctx.beginPath(); ctx.moveTo(0, -h * 0.8); ctx.lineTo(-15, -h-10); ctx.moveTo(0, -h * 0.8); ctx.lineTo(15, -h-10); ctx.stroke();
+             ctx.beginPath(); ctx.moveTo(0, -h/2); ctx.lineTo(-10, 0); ctx.moveTo(0, -h/2); ctx.lineTo(10, 0); ctx.stroke();
+        } else {
+             ctx.beginPath(); ctx.arc(0, -h, 10, 0, Math.PI*2); ctx.fillStyle="white"; ctx.fill(); ctx.stroke();
+             ctx.beginPath(); ctx.moveTo(0, -h + 10); ctx.lineTo(0, -h/2); ctx.stroke();
+             ctx.beginPath(); ctx.moveTo(0, -h/2); ctx.lineTo(-5, 0); ctx.moveTo(0, -h/2); ctx.lineTo(5, 0); ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    function drawCheese() {
+        if(cheese.radius <= 0) return;
+
+        ctx.save();
+        ctx.translate(cheese.x, cheese.y);
+        ctx.rotate(cheese.angle);
+
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetY = 5;
+        
+        ctx.fillStyle = cheese.color;
+        ctx.strokeStyle = "rgba(0,0,0,0.3)";
+        ctx.lineWidth = 2;
+
+        if (cheese.shape === 'circle') {
+            ctx.beginPath();
+            ctx.arc(0, 0, cheese.radius, 0, Math.PI * 2);
+            ctx.fill(); ctx.stroke();
+            ctx.fillStyle = "rgba(255,255,255,0.4)";
+            ctx.beginPath(); ctx.arc(cheese.radius*0.5, 0, cheese.radius*0.2, 0, Math.PI*2); ctx.fill();
+            if(cheese.type === 'brie') { ctx.lineWidth = 4; ctx.strokeStyle = "white"; ctx.stroke(); }
+            if(cheese.type === 'gouda') { ctx.lineWidth = 4; ctx.strokeStyle = "#d62828"; ctx.stroke(); }
+
+        } else if (cheese.shape === 'rect') {
+            ctx.fillRect(-cheese.radius, -cheese.radius, cheese.radius * 2, cheese.radius * 2);
+            ctx.strokeRect(-cheese.radius, -cheese.radius, cheese.radius * 2, cheese.radius * 2);
+            ctx.fillStyle = "black"; ctx.font = "20px Arial"; ctx.fillText(":(", -10, 5);
+
+        } else if (cheese.shape === 'triangle') {
+            ctx.beginPath();
+            ctx.moveTo(0, -cheese.radius);
+            ctx.lineTo(cheese.radius, cheese.radius);
+            ctx.lineTo(-cheese.radius, cheese.radius);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+            ctx.lineWidth = 4; ctx.strokeStyle = "#8B0000"; ctx.stroke();
+
+        } else if (cheese.shape === 'semicircle') {
+            ctx.beginPath();
+            ctx.arc(0, 0, cheese.radius, 0, Math.PI, false);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+            ctx.fillStyle = "#66ccff";
+            ctx.beginPath(); ctx.arc(-5, 10, 4, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(10, 5, 3, 0, Math.PI*2); ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    function createParticles(x, y, count, color) {
+        for(let i=0; i<count; i++) {
+            particles.push({
+                x: x,
+                y: y,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 1) * 10,
+                life: 1.0,
+                color: color,
+                size: Math.random() * 5 + 2
+            });
+        }
+    }
+
+    function updateParticles() {
+        for(let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.5; 
+            p.life -= 0.05;
+            if(p.life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    const comments = [
+        "Look at it go!",
+        "Pure dairy velocity!",
+        "Gravity is a cruel mistress.",
+        "Don't bruise the rind!",
+        "The stickman regrets everything.",
+        "Speed wobble!",
+        "Majestic.",
+        "The crowd goes wild (silently)!"
+    ];
+
+    function updateCommentary() {
+        if(cheese.vx > 18) {
+            setCommentary("IT'S SUPERSONIC!");
+        } else if (cheese.vx < 2 && cheese.x < FINISH_LINE_X) {
+            setCommentary("Come on, gravity, do your job!");
+        } else {
+            setCommentary(comments[Math.floor(Math.random() * comments.length)]);
+        }
+    }
+
+    function setCommentary(text) {
+        let el = document.getElementById('commentary');
+        if(el.innerText !== text) {
+            el.innerText = text;
+            el.style.transform = "scale(1.1)";
+            setTimeout(() => el.style.transform = "scale(1)", 100);
+        }
+    }
+
+</script>
+</body>
+</html>
